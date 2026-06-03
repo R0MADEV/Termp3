@@ -81,6 +81,7 @@ export class PlayerUI {
   private shuffle = false;
   private repeat: "off" | "all" | "one" = "all";
   private loading = false; // true between selecting a track and audio starting
+  private mutedVol: number | null = null; // pre-mute volume while muted
 
   constructor(
     private player: Player,
@@ -257,7 +258,27 @@ export class PlayerUI {
     this.prev();
   }
   controlVolume(delta: number) {
+    this.changeVolume(delta);
+  }
+
+  /** Changes the volume and persists it. */
+  private changeVolume(delta: number) {
+    this.mutedVol = null; // any manual change cancels mute
     this.player.setVolume(this.player.state.volume + delta);
+    saveSettings({ volume: this.player.state.volume });
+    this.renderMain();
+  }
+
+  /** Mutes (volume 0) or restores the previous volume. */
+  private toggleMute() {
+    if (this.mutedVol === null) {
+      this.mutedVol = this.player.state.volume;
+      this.player.setVolume(0);
+    } else {
+      this.player.setVolume(this.mutedVol);
+      this.mutedVol = null;
+    }
+    this.renderMain();
   }
 
   private marquee(text: string, width: number): string {
@@ -324,7 +345,7 @@ export class PlayerUI {
     const infoRows = [
       `${playState}   ${shuf} ${rep}`,
       `{green-fg}⏱  ${fmtTime(s.position)} / ${dur}{/}`,
-      `🔊 ${volBar} ${s.volume}%`,
+      `${s.volume === 0 ? "🔇" : "🔊"} ${volBar} ${s.volume}%`,
     ];
     const lcdRows = [t1, t2, t3].map(
       (r, i) =>
@@ -582,6 +603,32 @@ export class PlayerUI {
     this.screen.render();
   }
 
+  /** Full-screen keyboard help overlay. */
+  private showHelp() {
+    const box = blessed.box({
+      parent: this.screen,
+      top: "center",
+      left: "center",
+      width: 46,
+      height: 21,
+      tags: true,
+      keys: true,
+      scrollable: true,
+      border: { type: "line" },
+      label: t("ui.helpLabel"),
+      content: t("ui.helpScreen"),
+      style: { border: { fg: "green" }, fg: "green", bg: "black" },
+    });
+    this.modal = true;
+    const close = () => {
+      box.destroy();
+      this.endModal();
+    };
+    box.key(["escape", "?"], close);
+    box.focus();
+    this.screen.render();
+  }
+
   /** Settings menu: routes to the language or search-results pickers. */
   private openSettings() {
     const cur = loadSettings();
@@ -749,14 +796,10 @@ export class PlayerUI {
     this.screen.key(["d"], g(() => this.deleteSelected()));
     this.screen.key(["l"], g(() => this.promptLanguage()));
     this.screen.key(["o"], g(() => this.openSettings()));
-    this.screen.key(
-      ["+", "="],
-      g(() => this.player.setVolume(this.player.state.volume + 5)),
-    );
-    this.screen.key(
-      ["-"],
-      g(() => this.player.setVolume(this.player.state.volume - 5)),
-    );
+    this.screen.key(["?"], g(() => this.showHelp()));
+    this.screen.key(["+", "="], g(() => this.changeVolume(5)));
+    this.screen.key(["-"], g(() => this.changeVolume(-5)));
+    this.screen.key(["m"], g(() => this.toggleMute()));
     this.screen.key(["q", "C-c"], () => {
       this.player.quit();
       this.screen.destroy();

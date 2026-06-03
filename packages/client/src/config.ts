@@ -33,6 +33,7 @@ export function ensureConfig(): void {
 export interface Settings {
   lang?: string;
   searchLimit?: number;
+  volume?: number;
 }
 
 /** Reads persisted user settings (empty object if none). */

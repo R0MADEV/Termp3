@@ -96,7 +96,25 @@ CONTROLS (interface):
     "ui.state.pause": "PAUSE",
     "ui.state.stop": "STOP",
     "ui.help":
-      " {green-fg}↑↓{/} navigate  {green-fg}↵{/} play  {green-fg}space{/} pause  {green-fg}←→{/} seek  {green-fg}n/p{/} next/prev  {green-fg}s{/} shuf  {green-fg}r{/} rep  {green-fg}/{/} search  {green-fg}a{/} add  {green-fg}d{/} del  {green-fg}o{/} settings  {green-fg}+/-{/} vol  {green-fg}q{/} quit",
+      " {green-fg}↑↓{/} nav  {green-fg}↵{/} play  {green-fg}space{/} pause  {green-fg}n/p{/} next/prev  {green-fg}/{/} search  {green-fg}?{/} help  {green-fg}q{/} quit",
+    "ui.helpLabel": " Keys ",
+    "ui.helpScreen": `  {green-fg}↑ ↓{/}      navigate
+  {green-fg}Enter{/}    play selected
+  {green-fg}Space{/}    pause / resume
+  {green-fg}← →{/}      seek 5s
+  {green-fg}n / p{/}    next / previous
+  {green-fg}s{/}        shuffle on/off
+  {green-fg}r{/}        repeat (off / all / one)
+  {green-fg}/{/}        search YouTube
+  {green-fg}a{/}        add a URL
+  {green-fg}d{/}        delete selected
+  {green-fg}o{/}        settings (language, results)
+  {green-fg}+ / -{/}    volume
+  {green-fg}m{/}        mute
+  {green-fg}?{/}        this help
+  {green-fg}q{/}        quit
+
+  {gray-fg}Esc to close{/}`,
     "ui.langLabel": " Language ",
     "ui.settingsLabel": " Settings ",
     "ui.optLanguage": "Language",
@@ -182,7 +200,25 @@ CONTROLES (interfaz):
     "ui.state.pause": "PAUSA",
     "ui.state.stop": "STOP",
     "ui.help":
-      " {green-fg}↑↓{/} navegar  {green-fg}↵{/} play  {green-fg}espacio{/} pausa  {green-fg}←→{/} seek  {green-fg}n/p{/} sig/ant  {green-fg}s{/} aleat  {green-fg}r{/} rep  {green-fg}/{/} buscar  {green-fg}a{/} anadir  {green-fg}d{/} borrar  {green-fg}o{/} ajustes  {green-fg}+/-{/} vol  {green-fg}q{/} salir",
+      " {green-fg}↑↓{/} nav  {green-fg}↵{/} play  {green-fg}espacio{/} pausa  {green-fg}n/p{/} sig/ant  {green-fg}/{/} buscar  {green-fg}?{/} ayuda  {green-fg}q{/} salir",
+    "ui.helpLabel": " Teclas ",
+    "ui.helpScreen": `  {green-fg}↑ ↓{/}      navegar
+  {green-fg}Enter{/}    reproducir seleccionada
+  {green-fg}Espacio{/}  pausa / reanudar
+  {green-fg}← →{/}      avanzar/retroceder 5s
+  {green-fg}n / p{/}    siguiente / anterior
+  {green-fg}s{/}        aleatorio on/off
+  {green-fg}r{/}        repetir (off / todo / una)
+  {green-fg}/{/}        buscar en YouTube
+  {green-fg}a{/}        anadir una URL
+  {green-fg}d{/}        borrar seleccionada
+  {green-fg}o{/}        ajustes (idioma, resultados)
+  {green-fg}+ / -{/}    volumen
+  {green-fg}m{/}        silenciar
+  {green-fg}?{/}        esta ayuda
+  {green-fg}q{/}        salir
+
+  {gray-fg}Esc para cerrar{/}`,
     "ui.langLabel": " Idioma ",
     "ui.settingsLabel": " Ajustes ",
     "ui.optLanguage": "Idioma",
