@@ -124,6 +124,7 @@ export class PlayerUI {
       tags: true,
       keys: true,
       vi: true,
+      mouse: true,
       border: { type: "line" },
       label: t("ui.playlistsLabel"),
       style: {
@@ -142,6 +143,7 @@ export class PlayerUI {
       tags: true,
       keys: true,
       vi: true,
+      mouse: true,
       border: { type: "line" },
       label: " PLAYLIST ",
       style: {
@@ -958,6 +960,10 @@ export class PlayerUI {
       const name = listPlaylists()[index];
       if (name) this.switchToPlaylist(name);
     });
+
+    // Clicking a panel moves focus to it.
+    this.list.on("click", () => this.focusPanel("tracks"));
+    this.sidebar.on("click", () => this.focusPanel("sidebar"));
 
     // Global player controls are ignored while a popup (modal) is open.
     const g = (fn: () => void) => () => {
