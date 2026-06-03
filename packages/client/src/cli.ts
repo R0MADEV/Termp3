@@ -10,8 +10,8 @@ import { checkMpv, checkYtDlp, installHint } from "./deps.ts";
 import { Player } from "./player.ts";
 import { loadPlaylist, resolveTitles, addUrl } from "./playlist.ts";
 import { PLAYLISTS_DIR, loadSettings, saveSettings } from "./config.ts";
-import { PlayerUI } from "./ui/player.ts";
 import { MiniUI } from "./ui/mini.ts";
+import { runInkUI } from "./ui/ink/app.tsx";
 import { startTitleBroadcast } from "./title.ts";
 import { startStatusBroadcast, readStatus } from "./status.ts";
 import { startControlServer, sendControl } from "./control.ts";
@@ -63,22 +63,12 @@ async function launchUI() {
   const player = new Player(mpv.path ?? "mpv", loadSettings().volume ?? 100);
   await player.start();
 
-  const ui = new PlayerUI(player, tracks);
-  ui.start();
-
   // "Now playing" visible in any terminal (title) and in tmux/zellij bars (file).
   startTitleBroadcast(player);
   startStatusBroadcast(player);
-  // Control from another tab: termp3 pause/next/prev/vol.
-  startControlServer({
-    pause: () => ui.controlPause(),
-    next: () => ui.controlNext(),
-    prev: () => ui.controlPrev(),
-    volume: (d) => ui.controlVolume(d),
-  });
 
-  // Resolve any missing titles in the background and refresh the UI.
-  resolveTitles(tracks, (i, t) => ui.updateTrack(i, t)).catch(() => {});
+  // Ink prototype UI (ink-ui branch).
+  runInkUI(player, tracks);
 }
 
 async function launchMini(position: "top" | "bottom") {
