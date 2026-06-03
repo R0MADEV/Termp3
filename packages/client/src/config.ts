@@ -19,6 +19,8 @@ export const DEFAULT_PLAYLIST_NAME = "Default";
 export const TITLES_CACHE = join(CONFIG_DIR, "titles.json");
 // User settings (language, etc.).
 export const SETTINGS_FILE = join(CONFIG_DIR, "settings.json");
+// Custom color themes (name -> { accent, spectrum }).
+export const THEMES_FILE = join(CONFIG_DIR, "themes.json");
 // "Now playing" status for integration with tmux/zellij or other bars.
 export const STATUS_FILE = join(CONFIG_DIR, "status.txt");
 // Control socket: lets you drive the running player from another tab.
@@ -47,13 +49,25 @@ export function ensureConfig(): void {
     if (existsSync(PLAYLIST_FILE)) copyFileSync(PLAYLIST_FILE, defaultFile);
     else writeFileSync(defaultFile, DEFAULT_PLAYLIST);
   }
+
+  // Drop a sample custom theme so the format is discoverable.
+  if (!existsSync(THEMES_FILE)) writeFileSync(THEMES_FILE, EXAMPLE_THEMES);
 }
+
+// Example custom themes file. accent = main color; spectrum = [low, mid, high].
+// Colors are terminal names: green, yellow, red, cyan, blue, magenta, white…
+const EXAMPLE_THEMES = `${JSON.stringify(
+  { Ocean: { accent: "cyan", spectrum: ["blue", "cyan", "white"] } },
+  null,
+  2,
+)}\n`;
 
 export interface Settings {
   lang?: string;
   searchLimit?: number;
   volume?: number;
   activePlaylist?: string;
+  theme?: string;
   // Resume: last track + position within the last playlist.
   lastPlaylist?: string;
   lastUrl?: string;

@@ -99,24 +99,24 @@ CONTROLS (interface):
     "ui.state.pause": "PAUSE",
     "ui.state.stop": "STOP",
     "ui.help":
-      " {green-fg}↑↓{/} nav  {green-fg}↵{/} play  {green-fg}space{/} pause  {green-fg}n/p{/} next/prev  {green-fg}/{/} search  {green-fg}?{/} help  {green-fg}q{/} quit",
+      " {a}↑↓{/} nav  {a}↵{/} play  {a}space{/} pause  {a}n/p{/} next/prev  {a}/{/} search  {a}?{/} help  {a}q{/} quit",
     "ui.helpLabel": " Keys ",
-    "ui.helpScreen": `  {green-fg}Tab{/}      switch panel (tracks / playlists)
-  {green-fg}↑ ↓{/}      navigate
-  {green-fg}Enter{/}    play selected (or open playlist)
-  {green-fg}Space{/}    pause / resume
-  {green-fg}← →{/}      seek 5s
-  {green-fg}n / p{/}    next / previous
-  {green-fg}s{/}        shuffle on/off
-  {green-fg}r{/}        repeat (off / all / one)
-  {green-fg}/{/}        search YouTube
-  {green-fg}a{/}        add a URL
-  {green-fg}d{/}        delete selected
-  {green-fg}o{/}        settings (language, results)
-  {green-fg}+ / -{/}    volume
-  {green-fg}m{/}        mute
-  {green-fg}?{/}        this help
-  {green-fg}q{/}        quit
+    "ui.helpScreen": `  {a}Tab{/}      switch panel (tracks / playlists)
+  {a}↑ ↓{/}      navigate
+  {a}Enter{/}    play selected (or open playlist)
+  {a}Space{/}    pause / resume
+  {a}← →{/}      seek 5s
+  {a}n / p{/}    next / previous
+  {a}s{/}        shuffle on/off
+  {a}r{/}        repeat (off / all / one)
+  {a}/{/}        search YouTube
+  {a}a{/}        add a URL
+  {a}d{/}        delete selected
+  {a}o{/}        settings (language, results)
+  {a}+ / -{/}    volume
+  {a}m{/}        mute
+  {a}?{/}        this help
+  {a}q{/}        quit
 
   {gray-fg}Esc to close{/}`,
     "ui.langLabel": " Language ",
@@ -124,6 +124,8 @@ CONTROLS (interface):
     "ui.optLanguage": "Language",
     "ui.optSearch": "Search results",
     "ui.optPlaylist": "Playlist",
+    "ui.optTheme": "Theme",
+    "ui.themesLabel": " Theme ",
     "ui.searchLimitLabel": " Search results ",
     "ui.resultsCount": "{n} results",
     "ui.playlistsLabel": " Playlists ",
@@ -209,24 +211,24 @@ CONTROLES (interfaz):
     "ui.state.pause": "PAUSA",
     "ui.state.stop": "STOP",
     "ui.help":
-      " {green-fg}↑↓{/} nav  {green-fg}↵{/} play  {green-fg}espacio{/} pausa  {green-fg}n/p{/} sig/ant  {green-fg}/{/} buscar  {green-fg}?{/} ayuda  {green-fg}q{/} salir",
+      " {a}↑↓{/} nav  {a}↵{/} play  {a}espacio{/} pausa  {a}n/p{/} sig/ant  {a}/{/} buscar  {a}?{/} ayuda  {a}q{/} salir",
     "ui.helpLabel": " Teclas ",
-    "ui.helpScreen": `  {green-fg}Tab{/}      cambiar panel (canciones / listas)
-  {green-fg}↑ ↓{/}      navegar
-  {green-fg}Enter{/}    reproducir seleccionada (o abrir lista)
-  {green-fg}Espacio{/}  pausa / reanudar
-  {green-fg}← →{/}      avanzar/retroceder 5s
-  {green-fg}n / p{/}    siguiente / anterior
-  {green-fg}s{/}        aleatorio on/off
-  {green-fg}r{/}        repetir (off / todo / una)
-  {green-fg}/{/}        buscar en YouTube
-  {green-fg}a{/}        anadir una URL
-  {green-fg}d{/}        borrar seleccionada
-  {green-fg}o{/}        ajustes (idioma, resultados)
-  {green-fg}+ / -{/}    volumen
-  {green-fg}m{/}        silenciar
-  {green-fg}?{/}        esta ayuda
-  {green-fg}q{/}        salir
+    "ui.helpScreen": `  {a}Tab{/}      cambiar panel (canciones / listas)
+  {a}↑ ↓{/}      navegar
+  {a}Enter{/}    reproducir seleccionada (o abrir lista)
+  {a}Espacio{/}  pausa / reanudar
+  {a}← →{/}      avanzar/retroceder 5s
+  {a}n / p{/}    siguiente / anterior
+  {a}s{/}        aleatorio on/off
+  {a}r{/}        repetir (off / todo / una)
+  {a}/{/}        buscar en YouTube
+  {a}a{/}        anadir una URL
+  {a}d{/}        borrar seleccionada
+  {a}o{/}        ajustes (idioma, resultados)
+  {a}+ / -{/}    volumen
+  {a}m{/}        silenciar
+  {a}?{/}        esta ayuda
+  {a}q{/}        salir
 
   {gray-fg}Esc para cerrar{/}`,
     "ui.langLabel": " Idioma ",
@@ -234,6 +236,8 @@ CONTROLES (interfaz):
     "ui.optLanguage": "Idioma",
     "ui.optSearch": "Resultados de busqueda",
     "ui.optPlaylist": "Lista",
+    "ui.optTheme": "Tema",
+    "ui.themesLabel": " Tema ",
     "ui.searchLimitLabel": " Resultados de busqueda ",
     "ui.resultsCount": "{n} resultados",
     "ui.playlistsLabel": " Listas ",

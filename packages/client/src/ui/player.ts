@@ -36,6 +36,13 @@ import {
   LOCALE_NAMES,
 } from "../i18n.ts";
 import { saveSettings, loadSettings } from "../config.ts";
+import {
+  theme,
+  themed,
+  listThemes,
+  activeThemeName,
+  setTheme,
+} from "../theme.ts";
 
 const BAR_COUNT = 40;
 const SPECTRUM_HEIGHT = 6; // visualizer height in rows
@@ -114,7 +121,7 @@ export class PlayerUI {
       tags: true,
       border: { type: "line" },
       label: " ♫ termp3 ",
-      style: { border: { fg: "green" }, fg: "green", bg: "black" },
+      style: this.boxStyle(),
     });
 
     this.sidebar = blessed.list({
@@ -128,12 +135,7 @@ export class PlayerUI {
       mouse: true,
       border: { type: "line" },
       label: t("ui.playlistsLabel"),
-      style: {
-        border: { fg: "gray" },
-        fg: "green",
-        bg: "black",
-        selected: { bg: "green", fg: "black" },
-      },
+      style: this.boxStyle(),
     });
 
     this.list = blessed.list({
@@ -147,13 +149,7 @@ export class PlayerUI {
       mouse: true,
       border: { type: "line" },
       label: " PLAYLIST ",
-      style: {
-        border: { fg: "green" },
-        fg: "green",
-        bg: "black",
-        selected: { bg: "green", fg: "black" },
-        item: { fg: "green" },
-      },
+      style: this.boxStyle(),
     });
 
     this.status = blessed.box({
@@ -162,7 +158,7 @@ export class PlayerUI {
       right: 0,
       height: 1,
       tags: true,
-      content: t("ui.help"),
+      content: themed(t("ui.help")),
       style: { fg: "white", bg: "black" },
     });
 
@@ -207,6 +203,31 @@ export class PlayerUI {
     });
   }
 
+  /** Shared themed style for lists, boxes and popups. */
+  private boxStyle() {
+    const a = theme().accent;
+    return {
+      border: { fg: a },
+      fg: a,
+      bg: "black",
+      selected: { bg: a, fg: "black" },
+      item: { fg: a },
+    };
+  }
+
+  /** Re-applies the current theme to the persistent UI and re-renders. */
+  private applyTheme() {
+    const a = theme().accent;
+    this.main.style.border.fg = a;
+    this.list.style.selected.bg = a;
+    this.sidebar.style.selected.bg = a;
+    this.status.setContent(themed(t("ui.help")));
+    this.focusPanel(this.focused); // re-colors borders for the focused panel
+    this.refreshSidebar();
+    this.refreshList();
+    this.renderMain();
+  }
+
   private refreshList() {
     if (this.tracks.length === 0) {
       this.list.setItems([`  {gray-fg}${t("ui.emptyHint")}{/}`]);
@@ -214,9 +235,10 @@ export class PlayerUI {
       this.screen.render();
       return;
     }
+    const a = theme().accent;
     const items = this.tracks.map((track, i) => {
       const playing =
-        i === this.currentIndex ? "{green-fg}▶{/} " : "{gray-fg}♪{/} ";
+        i === this.currentIndex ? `{${a}-fg}▶{/} ` : "{gray-fg}♪{/} ";
       const num = `{gray-fg}${String(i + 1).padStart(2, " ")}.{/}`;
       const title = track.resolved
         ? track.title
@@ -232,8 +254,9 @@ export class PlayerUI {
   private refreshSidebar() {
     const names = listPlaylists();
     const active = activePlaylist();
+    const a = theme().accent;
     this.sidebar.setItems(
-      names.map((n) => (n === active ? `{green-fg}▶{/} ${n}` : `  ${n}`)),
+      names.map((n) => (n === active ? `{${a}-fg}▶{/} ${n}` : `  ${n}`)),
     );
     const idx = names.indexOf(active);
     if (idx >= 0) this.sidebar.select(idx);
@@ -255,9 +278,10 @@ export class PlayerUI {
   /** Moves keyboard focus between the tracks list and the sidebar. */
   private focusPanel(which: "tracks" | "sidebar") {
     this.focused = which;
+    const a = theme().accent;
     const tracksActive = which === "tracks";
-    this.list.style.border.fg = tracksActive ? "green" : "gray";
-    this.sidebar.style.border.fg = tracksActive ? "gray" : "green";
+    this.list.style.border.fg = tracksActive ? a : "gray";
+    this.sidebar.style.border.fg = tracksActive ? "gray" : a;
     (tracksActive ? this.list : this.sidebar).focus();
     this.screen.render();
   }
@@ -365,13 +389,14 @@ export class PlayerUI {
     return (padded + padded).slice(off, off + width);
   }
 
-  /** Vertical spectrum with a green→yellow→red gradient (retro style). */
+  /** Vertical spectrum with the theme's low→mid→high gradient. */
   private renderSpectrumRows(width: number): string[] {
     const cols = Math.min(BAR_COUNT, Math.max(0, width));
+    const [low, mid, high] = theme().spectrum;
     const rows: string[] = [];
-    // From the top (high level, "hot") down to the bottom (low level, green).
+    // From the top (high level, "hot") down to the bottom (low level).
     for (let level = SPECTRUM_HEIGHT - 1; level >= 0; level--) {
-      const color = level >= 4 ? "red" : level >= 2 ? "yellow" : "green";
+      const color = level >= 4 ? high : level >= 2 ? mid : low;
       let line = "";
       for (let i = 0; i < cols; i++) {
         const h = this.spectrum[i] ?? 0;
@@ -384,6 +409,7 @@ export class PlayerUI {
 
   private renderMain() {
     const s = this.player.state;
+    const a = theme().accent;
     // Audio started → clear the loading flag and any transient error message.
     if (s.position > 0) {
       this.loading = false;
@@ -398,7 +424,7 @@ export class PlayerUI {
       : s.paused
         ? `{yellow-fg}⏸  ${t("ui.state.pause")}{/}`
         : s.url
-          ? `{green-fg}▶  ${t("ui.state.play")}{/}`
+          ? `{${a}-fg}▶  ${t("ui.state.play")}{/}`
           : `{gray-fg}■  ${t("ui.state.stop")}{/}`;
 
     // Big LCD counter (3 rows) on the left + info on the right.
@@ -407,26 +433,26 @@ export class PlayerUI {
     const volBarW = 12;
     const volFilled = Math.round((Math.min(100, s.volume) / 100) * volBarW);
     const volBar =
-      "{green-fg}" +
+      "{${a}-fg}" +
       "▉".repeat(volFilled) +
       "{/}{gray-fg}" +
       "░".repeat(volBarW - volFilled) +
       "{/}";
-    const shuf = this.shuffle ? "{green-fg}🔀{/}" : "{gray-fg}🔀{/}";
+    const shuf = this.shuffle ? "{${a}-fg}🔀{/}" : "{gray-fg}🔀{/}";
     const rep =
       this.repeat === "one"
-        ? "{green-fg}🔂{/}"
+        ? "{${a}-fg}🔂{/}"
         : this.repeat === "all"
-          ? "{green-fg}🔁{/}"
+          ? "{${a}-fg}🔁{/}"
           : "{gray-fg}🔁{/}";
     const infoRows = [
       `${playState}   ${shuf} ${rep}`,
-      `{green-fg}⏱  ${fmtTime(s.position)} / ${dur}{/}`,
+      `{${a}-fg}⏱  ${fmtTime(s.position)} / ${dur}{/}`,
       `${s.volume === 0 ? "🔇" : "🔊"} ${volBar} ${s.volume}%`,
     ];
     const lcdRows = [t1, t2, t3].map(
       (r, i) =>
-        `  {bold}{green-fg}${r}{/}{/}`.padEnd(lcdW + 24) + (infoRows[i] ?? ""),
+        `  {bold}{${a}-fg}${r}{/}{/}`.padEnd(lcdW + 24) + (infoRows[i] ?? ""),
     );
 
     // Wide progress bar.
@@ -434,7 +460,7 @@ export class PlayerUI {
     const ratio = s.duration > 0 ? Math.min(1, s.position / s.duration) : 0;
     const filled = Math.round(ratio * barW);
     const progress =
-      "{green-fg}" +
+      "{${a}-fg}" +
       "━".repeat(filled) +
       "◉{/}{gray-fg}" +
       "━".repeat(Math.max(0, barW - filled)) +
@@ -444,7 +470,7 @@ export class PlayerUI {
 
     const firstLine = this.errorMsg
       ? `  {red-fg}${this.marquee(this.errorMsg, inner - 2)}{/}`
-      : `  {green-fg}♪{/} {bold}${this.marquee(title, inner - 4)}{/}`;
+      : `  {${a}-fg}♪{/} {bold}${this.marquee(title, inner - 4)}{/}`;
 
     const content = [
       firstLine,
@@ -495,7 +521,7 @@ export class PlayerUI {
       tags: true,
       border: { type: "line" },
       label: t("ui.deleteLabel"),
-      style: { border: { fg: "red" }, fg: "green", bg: "black" },
+      style: { ...this.boxStyle(), border: { fg: "red" } },
     });
     this.modal = true;
     q.ask(t("ui.deleteConfirm", { title: track.title }), (_err, ok) => {
@@ -536,7 +562,7 @@ export class PlayerUI {
       tags: true,
       border: { type: "line" },
       label: t("ui.deleteLabel"),
-      style: { border: { fg: "red" }, fg: "green", bg: "black" },
+      style: { ...this.boxStyle(), border: { fg: "red" } },
     });
     this.modal = true;
     q.ask(t("ui.deletePlaylistConfirm", { name }), (_err, ok) => {
@@ -596,7 +622,7 @@ export class PlayerUI {
       tags: true,
       border: { type: "line" },
       label: t("ui.searchLabel"),
-      style: { border: { fg: "green" }, fg: "green", bg: "black" },
+      style: this.boxStyle(),
     });
     this.modal = true;
     prompt.input(t("ui.searchPrompt"), "", async (_err, value) => {
@@ -612,7 +638,7 @@ export class PlayerUI {
         tags: true,
         border: { type: "line" },
         content: `  ${t("ui.searching")}`,
-        style: { border: { fg: "green" }, fg: "green", bg: "black" },
+        style: this.boxStyle(),
       });
       this.screen.render();
 
@@ -640,12 +666,7 @@ export class PlayerUI {
       border: { type: "line" },
       label: t("ui.resultsLabel"),
       items: results.map((r, i) => ` ${String(i + 1).padStart(2)}. ${r.title}`),
-      style: {
-        border: { fg: "green" },
-        fg: "green",
-        bg: "black",
-        selected: { bg: "green", fg: "black" },
-      },
+      style: this.boxStyle(),
     });
     picker.on("select", (_item, index) => {
       const chosen = results[index];
@@ -681,7 +702,7 @@ export class PlayerUI {
       tags: true,
       border: { type: "line" },
       label: t("ui.addLabel"),
-      style: { border: { fg: "green" }, fg: "green", bg: "black" },
+      style: this.boxStyle(),
     });
     this.modal = true;
     prompt.input(
@@ -700,7 +721,7 @@ export class PlayerUI {
             tags: true,
             border: { type: "line" },
             content: `  ${t("ui.importing")}`,
-            style: { border: { fg: "green" }, fg: "green", bg: "black" },
+            style: this.boxStyle(),
           });
           this.screen.render();
           await ensureYtDlp(() => {});
@@ -765,8 +786,8 @@ export class PlayerUI {
       scrollable: true,
       border: { type: "line" },
       label: t("ui.helpLabel"),
-      content: t("ui.helpScreen"),
-      style: { border: { fg: "green" }, fg: "green", bg: "black" },
+      content: themed(t("ui.helpScreen")),
+      style: this.boxStyle(),
     });
     this.modal = true;
     const close = () => {
@@ -794,6 +815,10 @@ export class PlayerUI {
         label: `${t("ui.optPlaylist")}:  ${activePlaylist()}`,
         action: () => this.promptPlaylists(),
       },
+      {
+        label: `${t("ui.optTheme")}:  ${activeThemeName()}`,
+        action: () => this.promptThemes(),
+      },
     ];
     const menu = blessed.list({
       parent: this.screen,
@@ -807,12 +832,7 @@ export class PlayerUI {
       border: { type: "line" },
       label: t("ui.settingsLabel"),
       items: options.map((o) => o.label),
-      style: {
-        border: { fg: "green" },
-        fg: "green",
-        bg: "black",
-        selected: { bg: "green", fg: "black" },
-      },
+      style: this.boxStyle(),
     });
     this.modal = true;
     menu.on("select", (_item, index) => {
@@ -843,12 +863,7 @@ export class PlayerUI {
       border: { type: "line" },
       label: t("ui.playlistsLabel"),
       items: names,
-      style: {
-        border: { fg: "green" },
-        fg: "green",
-        bg: "black",
-        selected: { bg: "green", fg: "black" },
-      },
+      style: this.boxStyle(),
     });
     const cur = names.indexOf(activePlaylist());
     if (cur >= 0) picker.select(cur);
@@ -856,6 +871,43 @@ export class PlayerUI {
       const name = names[index];
       picker.destroy();
       if (name) this.switchToPlaylist(name);
+      this.endModal();
+    });
+    picker.key(["escape"], () => {
+      picker.destroy();
+      this.endModal();
+    });
+    picker.focus();
+    this.screen.render();
+  }
+
+  /** Picker to choose the color theme; applies it live and persists it. */
+  private promptThemes() {
+    const names = listThemes();
+    const picker = blessed.list({
+      parent: this.screen,
+      top: "center",
+      left: "center",
+      width: 30,
+      height: Math.min(names.length + 2, 14),
+      tags: true,
+      keys: true,
+      vi: true,
+      scrollable: true,
+      border: { type: "line" },
+      label: t("ui.themesLabel"),
+      items: names,
+      style: this.boxStyle(),
+    });
+    const cur = names.indexOf(activeThemeName());
+    if (cur >= 0) picker.select(cur);
+    picker.on("select", (_item, index) => {
+      const name = names[index];
+      picker.destroy();
+      if (name) {
+        setTheme(name);
+        this.applyTheme();
+      }
       this.endModal();
     });
     picker.key(["escape"], () => {
@@ -882,12 +934,7 @@ export class PlayerUI {
       border: { type: "line" },
       label: t("ui.searchLimitLabel"),
       items: presets.map((p) => t("ui.resultsCount", { n: p })),
-      style: {
-        border: { fg: "green" },
-        fg: "green",
-        bg: "black",
-        selected: { bg: "green", fg: "black" },
-      },
+      style: this.boxStyle(),
     });
     const idx = presets.indexOf(cur);
     if (idx >= 0) picker.select(idx);
@@ -920,12 +967,7 @@ export class PlayerUI {
       border: { type: "line" },
       label: t("ui.langLabel"),
       items: names,
-      style: {
-        border: { fg: "green" },
-        fg: "green",
-        bg: "black",
-        selected: { bg: "green", fg: "black" },
-      },
+      style: this.boxStyle(),
     });
     // Pre-select the current language.
     const cur = SUPPORTED_LOCALES.indexOf(getLocale());
