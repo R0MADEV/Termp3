@@ -280,30 +280,48 @@ function NowPlaying({
   );
 }
 
+/**
+ * Virtualized list panel: only the items that fit (maxVisible) are built and
+ * rendered, windowed around the selection. Scrolling reveals new rows and
+ * drops the off-screen ones — so a 4,000-track list costs the same as a tiny
+ * one.
+ */
 function Panel({
   title,
-  items,
+  count,
   selected,
   focused,
   maxVisible,
+  renderItem,
+  emptyHint,
   width,
   flexGrow,
 }: {
   title: string;
-  items: React.ReactNode[];
+  count: number;
   selected: number;
   focused: boolean;
   maxVisible: number;
+  renderItem: (index: number) => React.ReactNode;
+  emptyHint?: string;
   width?: number;
   flexGrow?: number;
 }) {
   const accent = theme().accent;
-  const max = maxVisible < items.length ? maxVisible : items.length;
+  const max = maxVisible < count ? maxVisible : count;
   const start =
-    max < items.length
-      ? Math.max(0, Math.min(selected - Math.floor(max / 2), items.length - max))
+    max < count
+      ? Math.max(0, Math.min(selected - Math.floor(max / 2), count - max))
       : 0;
-  const visible = items.slice(start, start + max);
+  const rows: React.ReactNode[] = [];
+  for (let i = start; i < start + max; i++) {
+    rows.push(
+      <Box key={i}>
+        <Text color={accent}>{i === selected && focused ? "› " : "  "}</Text>
+        {renderItem(i)}
+      </Box>,
+    );
+  }
   return (
     <Box
       borderStyle="round"
@@ -316,17 +334,15 @@ function Panel({
       <Text bold color={focused ? accent : "gray"}>
         {title}
       </Text>
-      {start > 0 && <Text dimColor> ▲ …</Text>}
-      {visible.map((node, i) => {
-        const idx = start + i;
-        return (
-          <Box key={idx}>
-            <Text color={accent}>{idx === selected && focused ? "› " : "  "}</Text>
-            {node}
-          </Box>
-        );
-      })}
-      {start + max < items.length && <Text dimColor> ▼ …</Text>}
+      {count === 0 && emptyHint ? (
+        <Text dimColor>{emptyHint}</Text>
+      ) : (
+        <>
+          {start > 0 && <Text dimColor> ▲ …</Text>}
+          {rows}
+          {start + max < count && <Text dimColor> ▼ …</Text>}
+        </>
+      )}
     </Box>
   );
 }
@@ -861,18 +877,26 @@ function App({
   // Rows available for list items (NowPlaying ~13 + status + borders/title).
   const panelMax = Math.max(3, rows - 18);
 
-  const sideItems = playlists.map((name) => (
-    <Text key={name} color={accent} bold={name === activePlaylist()}>
-      {name === activePlaylist() ? "▶ " : "  "}
-      {name.slice(0, SIDEBAR_W - 6)}
-    </Text>
-  ));
-  const trackItems = tracks.map((tr, i) => (
-    <Text key={i} color={accent} bold={i === current} dimColor={!tr.resolved}>
-      {i === current ? "▶ " : "  "}
-      {tr.title.slice(0, cols - SIDEBAR_W - 8)}
-    </Text>
-  ));
+  const active = activePlaylist();
+  const renderPlaylist = (i: number) => {
+    const name = playlists[i] ?? "";
+    return (
+      <Text color={accent} bold={name === active}>
+        {name === active ? "▶ " : "  "}
+        {name.slice(0, SIDEBAR_W - 6)}
+      </Text>
+    );
+  };
+  const renderTrack = (i: number) => {
+    const tr = tracks[i];
+    if (!tr) return null;
+    return (
+      <Text color={accent} bold={i === current} dimColor={!tr.resolved}>
+        {i === current ? "▶ " : "  "}
+        {tr.title.slice(0, cols - SIDEBAR_W - 8)}
+      </Text>
+    );
+  };
 
   return (
     <Box flexDirection="column" width={cols} height={rows}>
@@ -890,22 +914,21 @@ function App({
       <Box flexGrow={1}>
         <Panel
           title={t("ui.playlistsLabel").trim()}
-          items={sideItems}
+          count={playlists.length}
           selected={sideIdx}
           focused={focus === "sidebar"}
           maxVisible={panelMax}
+          renderItem={renderPlaylist}
           width={SIDEBAR_W}
         />
         <Panel
           title={t("ui.playlist", { n: tracks.length }).trim()}
-          items={
-            trackItems.length
-              ? trackItems
-              : [<Text key="e" dimColor>{t("ui.emptyHint")}</Text>]
-          }
+          count={tracks.length}
           selected={listIdx}
           focused={focus === "tracks"}
           maxVisible={panelMax}
+          renderItem={renderTrack}
+          emptyHint={t("ui.emptyHint")}
           flexGrow={1}
         />
       </Box>
