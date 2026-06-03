@@ -17,6 +17,8 @@ import {
   removeUrl,
   resolveTitles,
   searchYouTube,
+  isPlaylistUrl,
+  fetchPlaylistEntries,
   type SearchResult,
 } from "../playlist.ts";
 import { ensureYtDlp } from "../ytdlp.ts";
@@ -574,9 +576,35 @@ export class PlayerUI {
     prompt.input(
       t("ui.addPrompt"),
       "",
-      (_err, value) => {
+      async (_err, value) => {
         const url = (value ?? "").trim();
-        if (url) {
+        if (url && isPlaylistUrl(url)) {
+          // Expand a YouTube playlist/album into all its tracks.
+          const loading = blessed.box({
+            parent: this.screen,
+            top: "center",
+            left: "center",
+            width: "50%",
+            height: 3,
+            tags: true,
+            border: { type: "line" },
+            content: `  ${t("ui.importing")}`,
+            style: { border: { fg: "green" }, fg: "green", bg: "black" },
+          });
+          this.screen.render();
+          await ensureYtDlp(() => {});
+          const entries = await fetchPlaylistEntries(url);
+          loading.destroy();
+          for (const e of entries) {
+            if (addUrl(e.url).added) {
+              this.tracks.push({ url: e.url, title: e.title, resolved: true });
+            }
+          }
+          this.refreshList();
+          if (entries.length > 0) return this.flashThenEnd(
+            t("ui.imported", { n: entries.length }),
+          );
+        } else if (url) {
           const res = addUrl(url);
           if (res.added) {
             this.tracks.push({ url, title: url, resolved: false });

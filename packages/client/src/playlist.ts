@@ -74,6 +74,45 @@ export function searchYouTube(query: string, limit = 20): Promise<SearchResult[]
   });
 }
 
+/** True if a URL points to a YouTube playlist/album. */
+export function isPlaylistUrl(url: string): boolean {
+  return /[?&]list=/.test(url) || /\/playlist\?/.test(url);
+}
+
+/** Expands a YouTube playlist URL into its entries (flat, no download). */
+export function fetchPlaylistEntries(
+  url: string,
+  limit = 200,
+): Promise<SearchResult[]> {
+  return new Promise((resolve) => {
+    const proc = spawn(ytDlpCommand(), [
+      "--flat-playlist",
+      "--no-warnings",
+      "-I",
+      `1:${limit}`,
+      "--print",
+      "%(id)s\t%(title)s",
+      url,
+    ]);
+    let out = "";
+    proc.stdout.on("data", (d) => (out += d.toString()));
+    proc.on("error", () => resolve([]));
+    proc.on("close", () => {
+      const results = out
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .map((line) => {
+          const tab = line.indexOf("\t");
+          const id = tab >= 0 ? line.slice(0, tab) : line;
+          const title = tab >= 0 ? line.slice(tab + 1) : id;
+          return { url: `https://www.youtube.com/watch?v=${id}`, title };
+        });
+      resolve(results);
+    });
+  });
+}
+
 /** Removes a URL/path line from playlist.txt. Returns true if it was found. */
 export function removeUrl(url: string): boolean {
   ensureConfig();
