@@ -9,7 +9,7 @@
 import { checkMpv, checkYtDlp, installHint } from "./deps.ts";
 import { Player } from "./player.ts";
 import { loadPlaylist, resolveTitles, addUrl } from "./playlist.ts";
-import { PLAYLIST_FILE, loadSettings } from "./config.ts";
+import { PLAYLIST_FILE, loadSettings, saveSettings } from "./config.ts";
 import { PlayerUI } from "./ui/player.ts";
 import { MiniUI } from "./ui/mini.ts";
 import { startTitleBroadcast } from "./title.ts";
@@ -54,11 +54,9 @@ async function launchUI() {
     console.error(t("err.mpvMissing", { hint: installHint("mpv") }));
     process.exit(1);
   }
+  // Open even with an empty playlist: the user can press "/" to search or
+  // "a" to add tracks from inside the interface.
   const tracks = loadPlaylist();
-  if (tracks.length === 0) {
-    console.log(t("playlist.empty", { file: PLAYLIST_FILE }));
-    process.exit(0);
-  }
 
   await ensureYtDlpForTracks(tracks);
 
@@ -221,7 +219,7 @@ async function play(url: string) {
 }
 
 // --- argument routing ---
-const [, , cmd, arg] = process.argv;
+const [, , cmd, arg, arg2] = process.argv;
 
 switch (cmd) {
   case "play":
@@ -272,6 +270,39 @@ switch (cmd) {
     // Prints the "now playing" (for tmux/zellij bars). Empty if nothing is playing.
     console.log(readStatus());
     break;
+  case "config": {
+    const s = loadSettings();
+    if (!arg) {
+      console.log("termp3 settings:");
+      console.log(`  lang        = ${s.lang ?? "(auto)"}`);
+      console.log(`  searchLimit = ${s.searchLimit ?? 20}`);
+      console.log("\nUsage: termp3 config <key> <value>  (keys: lang, searchLimit)");
+      break;
+    }
+    if (arg2 === undefined) {
+      console.error("Usage: termp3 config <key> <value>  (keys: lang, searchLimit)");
+      process.exit(1);
+    }
+    if (arg === "lang") {
+      if (!(SUPPORTED_LOCALES as string[]).includes(arg2)) {
+        console.error(`Invalid lang. Supported: ${SUPPORTED_LOCALES.join(", ")}`);
+        process.exit(1);
+      }
+      saveSettings({ lang: arg2 });
+    } else if (arg === "searchLimit") {
+      const n = Number(arg2);
+      if (!Number.isInteger(n) || n < 1 || n > 100) {
+        console.error("searchLimit must be an integer between 1 and 100.");
+        process.exit(1);
+      }
+      saveSettings({ searchLimit: n });
+    } else {
+      console.error(`Unknown key: ${arg}  (keys: lang, searchLimit)`);
+      process.exit(1);
+    }
+    console.log(`✅ ${arg} = ${arg2}`);
+    break;
+  }
   case "setup":
     // Detects the OS and downloads yt-dlp if needed, then shows status.
     await ensureYtDlp((m) => console.log(m));

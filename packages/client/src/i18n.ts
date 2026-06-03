@@ -29,6 +29,7 @@ USAGE:
   termp3 play <url>     Play a single URL (line mode)
   termp3 status         Print the "now playing"
   termp3 setup          Download yt-dlp for your system (if needed)
+  termp3 config [k] [v] Show or change settings (lang, searchLimit)
   termp3 doctor         Check dependencies (mpv, yt-dlp)
 
 CONTROL FROM ANY TAB (with a player running):
@@ -76,18 +77,31 @@ CONTROLS (interface):
     "play.goodbye": "\n👋 see you\n",
     "deps.installFallback": "Install {dep} from its official site.",
     "ui.noSong": "— no song —",
+    "ui.emptyHint": "Press / to search or a to add a track",
     "ui.resolving": "resolving",
     "ui.cantPlay": "⚠ Can't play: {title} — skipping",
     "ui.allFailed": "⚠ No track could be played (check your connection?)",
     "ui.playlist": " PLAYLIST · {n} tracks ",
     "ui.addLabel": " Add URL ",
     "ui.addPrompt": "Paste a URL (YouTube, radio, stream) and press Enter:",
+    "ui.deleteLabel": " Delete ",
+    "ui.deleteConfirm": "Delete this track?  {title}",
+    "ui.searchLabel": " Search YouTube ",
+    "ui.searchPrompt": "Type a song or artist and press Enter:",
+    "ui.searching": "Searching…",
+    "ui.noResults": "No results.",
+    "ui.resultsLabel": " Results — ↵ play · Esc cancel ",
     "ui.state.play": "PLAY",
     "ui.state.pause": "PAUSE",
     "ui.state.stop": "STOP",
     "ui.help":
-      " {green-fg}↑↓{/} navigate  {green-fg}↵{/} play  {green-fg}space{/} pause  {green-fg}←→{/} seek  {green-fg}n/p{/} next/prev  {green-fg}a{/} add  {green-fg}d{/} del  {green-fg}l{/} lang  {green-fg}+/-{/} vol  {green-fg}q{/} quit",
+      " {green-fg}↑↓{/} navigate  {green-fg}↵{/} play  {green-fg}space{/} pause  {green-fg}←→{/} seek  {green-fg}n/p{/} next/prev  {green-fg}s{/} shuf  {green-fg}r{/} rep  {green-fg}/{/} search  {green-fg}a{/} add  {green-fg}d{/} del  {green-fg}o{/} settings  {green-fg}+/-{/} vol  {green-fg}q{/} quit",
     "ui.langLabel": " Language ",
+    "ui.settingsLabel": " Settings ",
+    "ui.optLanguage": "Language",
+    "ui.optSearch": "Search results",
+    "ui.searchLimitLabel": " Search results ",
+    "ui.resultsCount": "{n} results",
   },
   es: {
     "help.body": `
@@ -100,6 +114,7 @@ USO:
   termp3 play <url>     Reproduce una URL suelta (modo linea)
   termp3 status         Imprime el "ahora suena"
   termp3 setup          Descarga yt-dlp para tu sistema (si hace falta)
+  termp3 config [k] [v] Ver o cambiar ajustes (lang, searchLimit)
   termp3 doctor         Comprueba dependencias (mpv, yt-dlp)
 
 CONTROL DESDE CUALQUIER PESTANA (con un reproductor en marcha):
@@ -147,18 +162,31 @@ CONTROLES (interfaz):
     "play.goodbye": "\n👋 hasta luego\n",
     "deps.installFallback": "Instala {dep} desde su web oficial.",
     "ui.noSong": "— sin cancion —",
+    "ui.emptyHint": "Pulsa / para buscar o a para anadir",
     "ui.resolving": "resolviendo",
     "ui.cantPlay": "⚠ No se puede reproducir: {title} — saltando",
     "ui.allFailed": "⚠ No se pudo reproducir nada (¿revisa tu conexion?)",
     "ui.playlist": " PLAYLIST · {n} temas ",
     "ui.addLabel": " Anadir URL ",
     "ui.addPrompt": "Pega una URL (YouTube, radio, stream) y pulsa Enter:",
+    "ui.deleteLabel": " Borrar ",
+    "ui.deleteConfirm": "¿Borrar esta cancion?  {title}",
+    "ui.searchLabel": " Buscar en YouTube ",
+    "ui.searchPrompt": "Escribe una cancion o artista y pulsa Enter:",
+    "ui.searching": "Buscando…",
+    "ui.noResults": "Sin resultados.",
+    "ui.resultsLabel": " Resultados — ↵ reproducir · Esc cancelar ",
     "ui.state.play": "PLAY",
     "ui.state.pause": "PAUSA",
     "ui.state.stop": "STOP",
     "ui.help":
-      " {green-fg}↑↓{/} navegar  {green-fg}↵{/} play  {green-fg}espacio{/} pausa  {green-fg}←→{/} seek  {green-fg}n/p{/} sig/ant  {green-fg}a{/} anadir  {green-fg}d{/} borrar  {green-fg}l{/} idioma  {green-fg}+/-{/} vol  {green-fg}q{/} salir",
+      " {green-fg}↑↓{/} navegar  {green-fg}↵{/} play  {green-fg}espacio{/} pausa  {green-fg}←→{/} seek  {green-fg}n/p{/} sig/ant  {green-fg}s{/} aleat  {green-fg}r{/} rep  {green-fg}/{/} buscar  {green-fg}a{/} anadir  {green-fg}d{/} borrar  {green-fg}o{/} ajustes  {green-fg}+/-{/} vol  {green-fg}q{/} salir",
     "ui.langLabel": " Idioma ",
+    "ui.settingsLabel": " Ajustes ",
+    "ui.optLanguage": "Idioma",
+    "ui.optSearch": "Resultados de busqueda",
+    "ui.searchLimitLabel": " Resultados de busqueda ",
+    "ui.resultsCount": "{n} resultados",
   },
 };
 

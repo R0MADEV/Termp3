@@ -12,7 +12,14 @@
 import blessed from "blessed";
 import type { Player } from "../player.ts";
 import type { Track } from "../playlist.ts";
-import { addUrl, removeUrl, resolveTitles } from "../playlist.ts";
+import {
+  addUrl,
+  removeUrl,
+  resolveTitles,
+  searchYouTube,
+  type SearchResult,
+} from "../playlist.ts";
+import { ensureYtDlp } from "../ytdlp.ts";
 import {
   t,
   setLocale,
@@ -20,7 +27,7 @@ import {
   SUPPORTED_LOCALES,
   LOCALE_NAMES,
 } from "../i18n.ts";
-import { saveSettings } from "../config.ts";
+import { saveSettings, loadSettings } from "../config.ts";
 
 const BAR_COUNT = 40;
 const SPECTRUM_HEIGHT = 6; // visualizer height in rows
@@ -71,6 +78,8 @@ export class PlayerUI {
   private modal = false; // true while a popup (add URL / language) is open
   private playErrors = 0; // consecutive failed tracks (anti-loop guard)
   private errorMsg: string | null = null; // transient "can't play" banner
+  private shuffle = false;
+  private repeat: "off" | "all" | "one" = "all";
 
   constructor(
     private player: Player,
@@ -136,7 +145,7 @@ export class PlayerUI {
     this.player.on("ended", (reason: string) => {
       if (reason === "eof") {
         this.playErrors = 0;
-        this.next();
+        this.advance(true); // respects shuffle / repeat
       } else if (reason === "error") {
         const failed = this.tracks[this.currentIndex];
         this.playErrors++;
@@ -153,6 +162,12 @@ export class PlayerUI {
   }
 
   private refreshList() {
+    if (this.tracks.length === 0) {
+      this.list.setItems([`  {gray-fg}${t("ui.emptyHint")}{/}`]);
+      this.list.setLabel(t("ui.playlist", { n: 0 }));
+      this.screen.render();
+      return;
+    }
     const items = this.tracks.map((track, i) => {
       const playing =
         i === this.currentIndex ? "{green-fg}▶{/} " : "{gray-fg}♪{/} ";
@@ -186,16 +201,46 @@ export class PlayerUI {
     this.screen.render();
   }
 
+  /**
+   * Decides the next index to play.
+   * @param auto true when triggered by a track finishing (respects repeat-one
+   *   and stops at the end when repeat is "off"); false for a manual skip.
+   * Returns null to mean "stop" (end reached with repeat off).
+   */
+  private pickNext(auto: boolean): number | null {
+    const n = this.tracks.length;
+    if (n === 0) return null;
+    if (auto && this.repeat === "one") {
+      return this.currentIndex >= 0 ? this.currentIndex : 0;
+    }
+    if (this.shuffle && n > 1) {
+      let r = this.currentIndex;
+      while (r === this.currentIndex) r = Math.floor(Math.random() * n);
+      return r;
+    }
+    const next = this.currentIndex + 1;
+    if (next >= n) return auto && this.repeat === "off" ? null : 0;
+    return next;
+  }
+
+  private advance(auto: boolean) {
+    const i = this.pickNext(auto);
+    if (i !== null) this.playIndex(i);
+  }
+
+  /** Manual "next" (used by the keyboard and the control socket). */
   private next() {
-    if (this.tracks.length === 0) return;
-    this.playIndex((this.currentIndex + 1) % this.tracks.length);
+    this.advance(false);
   }
 
   private prev() {
-    if (this.tracks.length === 0) return;
-    this.playIndex(
-      (this.currentIndex - 1 + this.tracks.length) % this.tracks.length,
-    );
+    const n = this.tracks.length;
+    if (n === 0) return;
+    if (this.shuffle && n > 1) {
+      this.advance(false);
+      return;
+    }
+    this.playIndex((this.currentIndex - 1 + n) % n);
   }
 
   // --- External control (socket): drivable from another tab ---
@@ -261,8 +306,15 @@ export class PlayerUI {
       "{/}{gray-fg}" +
       "░".repeat(volBarW - volFilled) +
       "{/}";
+    const shuf = this.shuffle ? "{green-fg}🔀{/}" : "{gray-fg}🔀{/}";
+    const rep =
+      this.repeat === "one"
+        ? "{green-fg}🔂{/}"
+        : this.repeat === "all"
+          ? "{green-fg}🔁{/}"
+          : "{gray-fg}🔁{/}";
     const infoRows = [
-      `${playState}`,
+      `${playState}   ${shuf} ${rep}`,
       `{green-fg}⏱  ${fmtTime(s.position)} / ${dur}{/}`,
       `🔊 ${volBar} ${s.volume}%`,
     ];
@@ -322,21 +374,157 @@ export class PlayerUI {
     this.renderMain();
   }
 
-  /** Removes the highlighted track from the playlist (list + file). */
+  /** Asks for confirmation, then removes the highlighted track (list + file). */
   private deleteSelected() {
     const i = (this.list as unknown as { selected: number }).selected;
     const track = this.tracks[i];
     if (!track) return;
-    removeUrl(track.url);
-    this.tracks.splice(i, 1);
-    // Keep currentIndex pointing at the right track after the removal.
-    if (this.currentIndex === i) this.currentIndex = -1;
-    else if (this.currentIndex > i) this.currentIndex--;
-    this.refreshList();
-    if (this.tracks.length > 0) {
-      this.list.select(Math.min(i, this.tracks.length - 1));
-    }
-    this.renderMain();
+
+    const q = blessed.question({
+      parent: this.screen,
+      top: "center",
+      left: "center",
+      width: "60%",
+      height: "shrink",
+      tags: true,
+      border: { type: "line" },
+      label: t("ui.deleteLabel"),
+      style: { border: { fg: "red" }, fg: "green", bg: "black" },
+    });
+    this.modal = true;
+    q.ask(t("ui.deleteConfirm", { title: track.title }), (_err, ok) => {
+      if (ok) {
+        removeUrl(track.url);
+        this.tracks.splice(i, 1);
+        // Keep currentIndex pointing at the right track after the removal.
+        if (this.currentIndex === i) this.currentIndex = -1;
+        else if (this.currentIndex > i) this.currentIndex--;
+        this.refreshList();
+        if (this.tracks.length > 0) {
+          this.list.select(Math.min(i, this.tracks.length - 1));
+        }
+        this.renderMain();
+      }
+      // Defer refocus so the closing keypress doesn't reach the playlist.
+      setTimeout(() => {
+        this.modal = false;
+        this.list.focus();
+        this.screen.render();
+      }, 0);
+    });
+  }
+
+  /** Closes the modal and refocuses the list on the next tick. */
+  private endModal() {
+    setTimeout(() => {
+      this.modal = false;
+      this.list.focus();
+      this.screen.render();
+    }, 0);
+  }
+
+  /** Shows a brief notice box, then ends the modal. */
+  private flashThenEnd(msg: string) {
+    const box = blessed.box({
+      parent: this.screen,
+      top: "center",
+      left: "center",
+      width: "40%",
+      height: 3,
+      tags: true,
+      border: { type: "line" },
+      content: `  ${msg}`,
+      style: { border: { fg: "yellow" }, fg: "yellow", bg: "black" },
+    });
+    this.screen.render();
+    setTimeout(() => {
+      box.destroy();
+      this.endModal();
+    }, 1200);
+  }
+
+  /** Asks for a query, searches YouTube, and lets the user pick a result. */
+  private promptSearch() {
+    const prompt = blessed.prompt({
+      parent: this.screen,
+      top: "center",
+      left: "center",
+      width: "70%",
+      height: 9,
+      tags: true,
+      border: { type: "line" },
+      label: t("ui.searchLabel"),
+      style: { border: { fg: "green" }, fg: "green", bg: "black" },
+    });
+    this.modal = true;
+    prompt.input(t("ui.searchPrompt"), "", async (_err, value) => {
+      const q = (value ?? "").trim();
+      if (!q) return this.endModal();
+
+      const loading = blessed.box({
+        parent: this.screen,
+        top: "center",
+        left: "center",
+        width: "50%",
+        height: 3,
+        tags: true,
+        border: { type: "line" },
+        content: `  ${t("ui.searching")}`,
+        style: { border: { fg: "green" }, fg: "green", bg: "black" },
+      });
+      this.screen.render();
+
+      await ensureYtDlp(() => {}); // make sure yt-dlp exists (silent)
+      const limit = loadSettings().searchLimit ?? 20;
+      const results = await searchYouTube(q, limit);
+      loading.destroy();
+
+      if (results.length === 0) return this.flashThenEnd(t("ui.noResults"));
+      this.showSearchResults(results);
+    });
+  }
+
+  private showSearchResults(results: SearchResult[]) {
+    const picker = blessed.list({
+      parent: this.screen,
+      top: "center",
+      left: "center",
+      width: "80%",
+      height: Math.min(results.length + 2, 16),
+      scrollable: true,
+      tags: true,
+      keys: true,
+      vi: true,
+      border: { type: "line" },
+      label: t("ui.resultsLabel"),
+      items: results.map((r, i) => ` ${String(i + 1).padStart(2)}. ${r.title}`),
+      style: {
+        border: { fg: "green" },
+        fg: "green",
+        bg: "black",
+        selected: { bg: "green", fg: "black" },
+      },
+    });
+    picker.on("select", (_item, index) => {
+      const chosen = results[index];
+      if (chosen) {
+        addUrl(chosen.url);
+        this.tracks.push({
+          url: chosen.url,
+          title: chosen.title,
+          resolved: true,
+        });
+        this.refreshList();
+        this.playIndex(this.tracks.length - 1, true); // play the new track
+      }
+      picker.destroy();
+      this.endModal();
+    });
+    picker.key(["escape"], () => {
+      picker.destroy();
+      this.endModal();
+    });
+    picker.focus();
     this.screen.render();
   }
 
@@ -383,6 +571,84 @@ export class PlayerUI {
     this.status.setContent(t("ui.help"));
     this.refreshList();
     this.renderMain();
+    this.screen.render();
+  }
+
+  /** Settings menu: routes to the language or search-results pickers. */
+  private openSettings() {
+    const cur = loadSettings();
+    const menu = blessed.list({
+      parent: this.screen,
+      top: "center",
+      left: "center",
+      width: 40,
+      height: 4,
+      tags: true,
+      keys: true,
+      vi: true,
+      border: { type: "line" },
+      label: t("ui.settingsLabel"),
+      items: [
+        `${t("ui.optLanguage")}:  ${LOCALE_NAMES[getLocale()]}`,
+        `${t("ui.optSearch")}:  ${cur.searchLimit ?? 20}`,
+      ],
+      style: {
+        border: { fg: "green" },
+        fg: "green",
+        bg: "black",
+        selected: { bg: "green", fg: "black" },
+      },
+    });
+    this.modal = true;
+    menu.on("select", (_item, index) => {
+      menu.destroy();
+      if (index === 0) this.promptLanguage();
+      else this.promptSearchLimit();
+    });
+    menu.key(["escape"], () => {
+      menu.destroy();
+      this.endModal();
+    });
+    menu.focus();
+    this.screen.render();
+  }
+
+  /** Popup to pick how many search results to fetch; persists the choice. */
+  private promptSearchLimit() {
+    const presets = [10, 20, 30, 50, 100];
+    const cur = loadSettings().searchLimit ?? 20;
+    const picker = blessed.list({
+      parent: this.screen,
+      top: "center",
+      left: "center",
+      width: 30,
+      height: presets.length + 2,
+      tags: true,
+      keys: true,
+      vi: true,
+      border: { type: "line" },
+      label: t("ui.searchLimitLabel"),
+      items: presets.map((p) => t("ui.resultsCount", { n: p })),
+      style: {
+        border: { fg: "green" },
+        fg: "green",
+        bg: "black",
+        selected: { bg: "green", fg: "black" },
+      },
+    });
+    const idx = presets.indexOf(cur);
+    if (idx >= 0) picker.select(idx);
+    picker.on("select", (_item, index) => {
+      const v = presets[index];
+      if (v) saveSettings({ searchLimit: v });
+      picker.destroy();
+      this.endModal();
+    });
+    picker.key(["escape"], () => {
+      picker.destroy();
+      this.endModal();
+    });
+    picker.focus();
     this.screen.render();
   }
 
@@ -455,9 +721,26 @@ export class PlayerUI {
     this.screen.key(["left"], g(() => this.player.seek(-5)));
     this.screen.key(["n"], g(() => this.next()));
     this.screen.key(["p"], g(() => this.prev()));
+    this.screen.key(
+      ["s"],
+      g(() => {
+        this.shuffle = !this.shuffle;
+        this.renderMain();
+      }),
+    );
+    this.screen.key(
+      ["r"],
+      g(() => {
+        this.repeat =
+          this.repeat === "off" ? "all" : this.repeat === "all" ? "one" : "off";
+        this.renderMain();
+      }),
+    );
     this.screen.key(["a"], g(() => this.promptAddUrl()));
+    this.screen.key(["/"], g(() => this.promptSearch()));
     this.screen.key(["d"], g(() => this.deleteSelected()));
     this.screen.key(["l"], g(() => this.promptLanguage()));
+    this.screen.key(["o"], g(() => this.openSettings()));
     this.screen.key(
       ["+", "="],
       g(() => this.player.setVolume(this.player.state.volume + 5)),

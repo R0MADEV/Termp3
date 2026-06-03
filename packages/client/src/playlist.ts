@@ -37,6 +37,43 @@ export function addUrl(
   return { added: true };
 }
 
+export interface SearchResult {
+  url: string;
+  title: string;
+}
+
+/**
+ * Searches YouTube via yt-dlp and returns a list of results (no download).
+ * Uses --flat-playlist so it stays fast.
+ */
+export function searchYouTube(query: string, limit = 20): Promise<SearchResult[]> {
+  return new Promise((resolve) => {
+    const proc = spawn(ytDlpCommand(), [
+      `ytsearch${limit}:${query}`,
+      "--flat-playlist",
+      "--no-warnings",
+      "--print",
+      "%(id)s\t%(title)s",
+    ]);
+    let out = "";
+    proc.stdout.on("data", (d) => (out += d.toString()));
+    proc.on("error", () => resolve([]));
+    proc.on("close", () => {
+      const results = out
+        .split(/\r?\n/)
+        .map((l) => l.trim())
+        .filter(Boolean)
+        .map((line) => {
+          const tab = line.indexOf("\t");
+          const id = tab >= 0 ? line.slice(0, tab) : line;
+          const title = tab >= 0 ? line.slice(tab + 1) : id;
+          return { url: `https://www.youtube.com/watch?v=${id}`, title };
+        });
+      resolve(results);
+    });
+  });
+}
+
 /** Removes a URL/path line from playlist.txt. Returns true if it was found. */
 export function removeUrl(url: string): boolean {
   ensureConfig();
