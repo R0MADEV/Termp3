@@ -11,6 +11,8 @@
   ],
   "scripts": {
     "dev": "bun run src/cli.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test",
     "build": "bun build src/cli.ts --target node --outfile dist/cli.js --external blessed",
     "build:binary": "bun build src/cli.ts --compile --outfile dist/termp3",
     "prepublishOnly": "bun run build"
@@ -31,6 +33,7 @@
   },
   "devDependencies": {
     "@types/blessed": "^0.1.27",
-    "@types/bun": "^1.3.14"
+    "@types/bun": "^1.3.14",
+    "typescript": "^6.0.3"
   }
 }

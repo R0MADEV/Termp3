@@ -29,10 +29,10 @@ const RELEASE_BASE =
 let resolved: string | null = null;
 
 /** Detects the OS + architecture and returns the matching release asset. */
-export function assetForPlatform(): { asset: string; label: string } {
-  const os = process.platform;
-  const arch = process.arch;
-
+export function assetForPlatform(
+  os: string = process.platform,
+  arch: string = process.arch,
+): { asset: string; label: string } {
   if (os === "win32") {
     return { asset: "yt-dlp.exe", label: "Windows" };
   }
