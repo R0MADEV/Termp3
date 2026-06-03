@@ -8,7 +8,7 @@
 
 import { checkMpv, checkYtDlp, installHint } from "./deps.ts";
 import { Player } from "./player.ts";
-import { loadPlaylist, resolveTitles, addUrl } from "./playlist.ts";
+import { loadPlaylist, addUrl } from "./playlist.ts";
 import { PLAYLISTS_DIR, loadSettings, saveSettings } from "./config.ts";
 import { runInkUI, controlBus } from "./ui/ink/app.tsx";
 import { AudioAnalyzer } from "./audio.ts";

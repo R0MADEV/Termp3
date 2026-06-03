@@ -15,7 +15,8 @@ import {
   setActivePlaylist,
   createPlaylist,
   removePlaylist,
-  resolveTitles,
+  resolveTitlesAt,
+  cacheTitles,
   addUrl,
   removeUrl,
   searchYouTube,
@@ -476,6 +477,9 @@ function App({
   const prevPaused = useRef(false);
   const specRef = useRef<number[]>(new Array(SPECTRUM_COLS).fill(0));
   const waveRef = useRef<number[]>(new Array(WAVE_POINTS).fill(0));
+  const inflight = useRef(new Set<string>()); // URLs whose title is resolving
+  // Rows available for list items (NowPlaying ~13 + status + borders/title).
+  const panelMax = Math.max(3, rows - 18);
 
   // --- playback ---
   const play = (i: number) => {
@@ -505,15 +509,7 @@ function App({
   };
 
   const reload = () => {
-    const tt = loadPlaylist();
-    setTracks(tt);
-    resolveTitles(tt, (i, tr) =>
-      setTracks((prev) => {
-        const copy = [...prev];
-        copy[i] = tr;
-        return copy;
-      }),
-    ).catch(() => {});
+    setTracks(loadPlaylist()); // titles resolve lazily for the visible window
   };
 
   const setVol = (v: number) => {
@@ -598,15 +594,8 @@ function App({
     return () => clearInterval(id);
   }, [player]);
 
-  // Resume + initial title resolution (once on mount).
+  // Resume the last track on mount (titles resolve lazily as you scroll).
   useEffect(() => {
-    resolveTitles(initialTracks, (i, tr) =>
-      setTracks((prev) => {
-        const copy = [...prev];
-        copy[i] = tr;
-        return copy;
-      }),
-    ).catch(() => {});
     const s = loadSettings();
     if (s.lastPlaylist === activePlaylist() && s.lastUrl) {
       const idx = initialTracks.findIndex((tr) => tr.url === s.lastUrl);
@@ -620,6 +609,36 @@ function App({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Lazily resolve titles only for the visible window (+ a small buffer).
+  useEffect(() => {
+    const n = tracks.length;
+    if (n === 0) return;
+    const max = Math.min(panelMax, n);
+    const start =
+      max < n ? Math.max(0, Math.min(listIdx - Math.floor(max / 2), n - max)) : 0;
+    const from = Math.max(0, start - 5);
+    const to = Math.min(n, start + max + 5);
+    const idxs: number[] = [];
+    for (let i = from; i < to; i++) {
+      const tr = tracks[i];
+      if (tr && !tr.resolved && !inflight.current.has(tr.url)) {
+        inflight.current.add(tr.url);
+        idxs.push(i);
+      }
+    }
+    if (idxs.length === 0) return;
+    const urls = idxs.map((i) => tracks[i]!.url);
+    resolveTitlesAt(tracks, idxs, (i, tr) =>
+      setTracks((prev) => {
+        const copy = [...prev];
+        copy[i] = tr;
+        return copy;
+      }),
+    ).finally(() => {
+      for (const u of urls) inflight.current.delete(u);
+    });
+  }, [listIdx, tracks, panelMax]);
 
   const quit = () => {
     const tr = tracks[current];
@@ -651,6 +670,7 @@ function App({
     if (isPlaylistUrl(url)) {
       const { name, entries } = await fetchPlaylist(url);
       if (entries.length === 0) return setOverlay({ kind: "none" });
+      cacheTitles(entries); // titles persist → instant on reopen, no storm
       const created = createPlaylist(name, entries.map((e) => e.url));
       setPlaylists(listPlaylists());
       setSideIdx(Math.max(0, listPlaylists().indexOf(created)));
@@ -847,6 +867,7 @@ function App({
     if (overlay.kind === "searchResults") {
       const r = overlay.results[sel];
       if (r) {
+        cacheTitles([r]);
         addUrl(r.url);
         reload();
         // play the newly added track once tracks reload
@@ -874,8 +895,6 @@ function App({
   }
 
   const loading = !!state.url && state.position === 0 && !state.paused;
-  // Rows available for list items (NowPlaying ~13 + status + borders/title).
-  const panelMax = Math.max(3, rows - 18);
 
   const active = activePlaylist();
   const renderPlaylist = (i: number) => {

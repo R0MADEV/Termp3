@@ -257,32 +257,44 @@ function saveCache(cache: Record<string, string>): void {
   writeFileSync(TITLES_CACHE, JSON.stringify(cache, null, 2));
 }
 
+/** Stores known titles in the cache (e.g. from an import or a search). */
+export function cacheTitles(items: { url: string; title: string }[]): void {
+  const cache = loadCache();
+  for (const it of items) if (it.url && it.title) cache[it.url] = it.title;
+  saveCache(cache);
+}
+
 /**
- * Resolves missing titles in parallel (bounded), updates the cache, and calls
- * onUpdate as each one resolves so the UI can refresh live.
+ * Resolves titles only for the given indices (the visible window), in parallel
+ * and bounded. Uses the cache first; persists new titles. Calls onUpdate as
+ * each one resolves. Lazy on purpose — a 4,000-track list never resolves all
+ * titles at once.
  */
-export async function resolveTitles(
+export async function resolveTitlesAt(
   tracks: Track[],
+  indices: number[],
   onUpdate: (index: number, track: Track) => void,
   concurrency = 4,
 ): Promise<void> {
   const cache = loadCache();
-  const pending = tracks
-    .map((t, i) => ({ t, i }))
-    .filter(({ t }) => !t.resolved);
+  const pending = indices.filter((i) => tracks[i] && !tracks[i]!.resolved);
 
   let cursor = 0;
   const worker = async () => {
     while (cursor < pending.length) {
-      const item = pending[cursor++];
-      if (!item) break;
-      const title = await fetchTitle(item.t.url);
+      const i = pending[cursor++]!;
+      const tr = tracks[i];
+      if (!tr || tr.resolved) continue;
+      const cached = cache[tr.url];
+      const title = cached ?? (await fetchTitle(tr.url));
       if (!title) continue;
-      item.t.title = title;
-      item.t.resolved = true;
-      cache[item.t.url] = title;
-      saveCache(cache);
-      onUpdate(item.i, item.t);
+      tr.title = title;
+      tr.resolved = true;
+      if (!cached) {
+        cache[tr.url] = title;
+        saveCache(cache);
+      }
+      onUpdate(i, tr);
     }
   };
   await Promise.all(
