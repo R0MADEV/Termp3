@@ -5,7 +5,7 @@
 // track shows up in Warp's tab bar from any pane.
 //
 // (Independent of the TUI: writing the title doesn't touch the screen
-//  contents, so it coexists with blessed without any issue.)
+//  contents, so it coexists with the UI without any issue.)
 
 import type { Player } from "./player.ts";
 

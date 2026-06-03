@@ -10,7 +10,6 @@ import { checkMpv, checkYtDlp, installHint } from "./deps.ts";
 import { Player } from "./player.ts";
 import { loadPlaylist, resolveTitles, addUrl } from "./playlist.ts";
 import { PLAYLISTS_DIR, loadSettings, saveSettings } from "./config.ts";
-import { MiniUI } from "./ui/mini.ts";
 import { runInkUI, controlBus } from "./ui/ink/app.tsx";
 import { startTitleBroadcast } from "./title.ts";
 import { startStatusBroadcast, readStatus } from "./status.ts";
@@ -76,39 +75,6 @@ async function launchUI() {
 
   // Ink UI.
   runInkUI(player, tracks);
-}
-
-async function launchMini(position: "top" | "bottom") {
-  const mpv = checkMpv();
-  if (!mpv.found) {
-    console.error(t("err.mpvMissing", { hint: installHint("mpv") }));
-    process.exit(1);
-  }
-  const tracks = loadPlaylist();
-  if (tracks.length === 0) {
-    console.log(t("playlist.empty", { file: PLAYLISTS_DIR }));
-    process.exit(0);
-  }
-
-  await ensureYtDlpForTracks(tracks);
-
-  const player = new Player(mpv.path ?? "mpv", loadSettings().volume ?? 100);
-  await player.start();
-
-  const ui = new MiniUI(player, tracks, position);
-  ui.start();
-
-  startTitleBroadcast(player);
-  startStatusBroadcast(player);
-  startControlServer({
-    pause: () => ui.controlPause(),
-    next: () => ui.controlNext(),
-    prev: () => ui.controlPrev(),
-    volume: (d) => ui.controlVolume(d),
-  });
-
-  // Resolve titles in the background (improves the strip's text).
-  resolveTitles(tracks, () => {}).catch(() => {});
 }
 
 function doctor() {
@@ -310,10 +276,6 @@ switch (cmd) {
     break;
   case undefined:
     await launchUI();
-    break;
-  case "--mini":
-  case "mini":
-    await launchMini(arg === "top" ? "top" : "bottom");
     break;
   case "--help":
   case "-h":

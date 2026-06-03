@@ -104,7 +104,7 @@ termp3/
 ## Estado / Roadmap
 
 - [x] Fase 0 — esqueleto + reproducir una URL en streaming
-- [x] Fase 1 — TUI retro (playlist, visualizador, títulos, modo mini, ahora-suena + control, i18n)
+- [x] Fase 1 — TUI moderna en Ink (playlist, búsqueda, visualizador, temas, i18n, ahora-suena + control)
 - [ ] Fase 2 — salas sincronizadas (WebSocket)
 - [ ] Fase 3 — rotación de DJ por turnos
 - [ ] Fase 4 — pulido, skins, binarios, publicación en npm

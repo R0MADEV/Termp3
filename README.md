@@ -104,7 +104,7 @@ termp3/
 ## Status / Roadmap
 
 - [x] Phase 0 — skeleton + stream a URL
-- [x] Phase 1 — retro TUI (playlist, visualizer, titles, mini mode, now-playing + control, i18n)
+- [x] Phase 1 — modern TUI in Ink (playlist, search, visualizer, themes, i18n, now-playing + control)
 - [ ] Phase 2 — synced rooms (WebSocket)
 - [ ] Phase 3 — turn-based DJ rotation
 - [ ] Phase 4 — polish, skins, binaries, npm release

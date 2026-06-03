@@ -24,7 +24,6 @@ termp3 v{version} — terminal music player
 
 USAGE:
   termp3                Open the player interface with your playlist
-  termp3 --mini [top]   Compact strip mode (floating), bottom by default
   termp3 add <url>      Add a URL to your playlist
   termp3 play <url>     Play a single URL (line mode)
   termp3 status         Print the "now playing"
@@ -136,7 +135,6 @@ termp3 v{version} — reproductor de musica en terminal
 
 USO:
   termp3                Abre la interfaz del reproductor con tu playlist
-  termp3 --mini [top]   Modo tira compacta (flotante), abajo por defecto
   termp3 add <url>      Anade una URL a tu playlist
   termp3 play <url>     Reproduce una URL suelta (modo linea)
   termp3 status         Imprime el "ahora suena"
