@@ -28,6 +28,7 @@ USAGE:
   termp3 add <url>      Add a URL to your playlist
   termp3 play <url>     Play a single URL (line mode)
   termp3 status         Print the "now playing"
+  termp3 setup          Download yt-dlp for your system (if needed)
   termp3 doctor         Check dependencies (mpv, yt-dlp)
 
 CONTROL FROM ANY TAB (with a player running):
@@ -61,6 +62,9 @@ CONTROLS (interface):
     "doctor.ytOk": "  ✅ yt-dlp   {version}",
     "doctor.ytMissing":
       "  ⚠️  yt-dlp   not found  →  {hint}  (only needed for YouTube)",
+    "doctor.ytDownloaded": "  ✅ yt-dlp   downloaded by termp3 ({size} MB)",
+    "doctor.ytAuto":
+      "  ⚙️  yt-dlp   not installed — will auto-download on first use ({asset})",
     "doctor.ready": "\n  Ready to play. 🎵\n",
     "doctor.needMpv": "\n  Install mpv to be able to play.\n",
     "add.ok": "✅ Added to the playlist:\n   {url}",
@@ -95,6 +99,7 @@ USO:
   termp3 add <url>      Anade una URL a tu playlist
   termp3 play <url>     Reproduce una URL suelta (modo linea)
   termp3 status         Imprime el "ahora suena"
+  termp3 setup          Descarga yt-dlp para tu sistema (si hace falta)
   termp3 doctor         Comprueba dependencias (mpv, yt-dlp)
 
 CONTROL DESDE CUALQUIER PESTANA (con un reproductor en marcha):
@@ -128,6 +133,9 @@ CONTROLES (interfaz):
     "doctor.ytOk": "  ✅ yt-dlp   {version}",
     "doctor.ytMissing":
       "  ⚠️  yt-dlp   no encontrado  →  {hint}  (solo necesario para YouTube)",
+    "doctor.ytDownloaded": "  ✅ yt-dlp   descargado por termp3 ({size} MB)",
+    "doctor.ytAuto":
+      "  ⚙️  yt-dlp   no instalado — se descargará al primer uso ({asset})",
     "doctor.ready": "\n  Listo para reproducir. 🎵\n",
     "doctor.needMpv": "\n  Instala mpv para poder reproducir.\n",
     "add.ok": "✅ Anadida a la playlist:\n   {url}",

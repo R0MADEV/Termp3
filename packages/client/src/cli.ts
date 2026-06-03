@@ -15,7 +15,20 @@ import { MiniUI } from "./ui/mini.ts";
 import { startTitleBroadcast } from "./title.ts";
 import { startStatusBroadcast, readStatus } from "./status.ts";
 import { startControlServer, sendControl } from "./control.ts";
+import {
+  ensureYtDlp,
+  findYtDlp,
+  hasDownloadedYtDlp,
+  downloadedSizeMB,
+  assetForPlatform,
+} from "./ytdlp.ts";
 import { t, setLocale, SUPPORTED_LOCALES, type Locale } from "./i18n.ts";
+
+/** Ensures yt-dlp is available if the playlist has any remote (streamed) URL. */
+async function ensureYtDlpForTracks(tracks: { url: string }[]): Promise<void> {
+  const hasRemote = tracks.some((t) => /^https?:\/\//i.test(t.url));
+  if (hasRemote) await ensureYtDlp((m) => console.log(m));
+}
 
 const VERSION = "0.0.1";
 
@@ -46,6 +59,8 @@ async function launchUI() {
     console.log(t("playlist.empty", { file: PLAYLIST_FILE }));
     process.exit(0);
   }
+
+  await ensureYtDlpForTracks(tracks);
 
   const player = new Player(mpv.path ?? "mpv");
   await player.start();
@@ -80,6 +95,8 @@ async function launchMini(position: "top" | "bottom") {
     process.exit(0);
   }
 
+  await ensureYtDlpForTracks(tracks);
+
   const player = new Player(mpv.path ?? "mpv");
   await player.start();
 
@@ -112,7 +129,9 @@ function doctor() {
   console.log(
     yt.found
       ? t("doctor.ytOk", { version: yt.version ?? "" })
-      : t("doctor.ytMissing", { hint: installHint("yt-dlp") }),
+      : hasDownloadedYtDlp()
+        ? t("doctor.ytDownloaded", { size: downloadedSizeMB() })
+        : t("doctor.ytAuto", { asset: assetForPlatform().asset }),
   );
   console.log(mpv.found ? t("doctor.ready") : t("doctor.needMpv"));
 }
@@ -136,10 +155,12 @@ async function play(url: string) {
     console.error(t("err.mpvMissing", { hint: installHint("mpv") }));
     process.exit(1);
   }
-  const yt = checkYtDlp();
-  if (/youtu\.?be/.test(url) && !yt.found) {
-    console.error(t("err.ytdlpYoutube", { hint: installHint("yt-dlp") }));
-    process.exit(1);
+  if (/^https?:\/\//i.test(url)) {
+    const yt = await ensureYtDlp((m) => console.log(m));
+    if (!yt && /youtu\.?be/.test(url)) {
+      console.error(t("err.ytdlpYoutube", { hint: installHint("yt-dlp") }));
+      process.exit(1);
+    }
   }
 
   const player = new Player(mpv.path ?? "mpv");
@@ -250,6 +271,11 @@ switch (cmd) {
   case "status":
     // Prints the "now playing" (for tmux/zellij bars). Empty if nothing is playing.
     console.log(readStatus());
+    break;
+  case "setup":
+    // Detects the OS and downloads yt-dlp if needed, then shows status.
+    await ensureYtDlp((m) => console.log(m));
+    doctor();
     break;
   case "doctor":
     doctor();

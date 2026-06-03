@@ -7,6 +7,7 @@ import { spawn } from "node:child_process";
 import { readFileSync, writeFileSync, existsSync, appendFileSync } from "node:fs";
 import { basename } from "node:path";
 import { PLAYLIST_FILE, TITLES_CACHE, ensureConfig } from "./config.ts";
+import { ytDlpCommand } from "./ytdlp.ts";
 
 export interface Track {
   url: string;
@@ -72,7 +73,7 @@ function saveCache(cache: Record<string, string>): void {
 /** Fetches a URL's title with yt-dlp (a single request, no download). */
 function fetchTitle(url: string): Promise<string | null> {
   return new Promise((resolve) => {
-    const proc = spawn("yt-dlp", [
+    const proc = spawn(ytDlpCommand(), [
       "--no-warnings",
       "--no-playlist",
       "--skip-download",

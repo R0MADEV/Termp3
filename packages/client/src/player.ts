@@ -13,7 +13,8 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { createConnection, type Socket } from "node:net";
 import { EventEmitter } from "node:events";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, delimiter } from "node:path";
+import { YTDLP_DIR } from "./ytdlp.ts";
 
 export interface PlayerState {
   url: string | null;
@@ -53,6 +54,13 @@ export class Player extends EventEmitter {
 
   /** Starts the mpv process and opens the control channel. */
   async start(): Promise<void> {
+    // Make sure mpv's ytdl_hook can find our (possibly auto-downloaded)
+    // yt-dlp by prepending termp3's bin dir to the child's PATH.
+    const env = {
+      ...process.env,
+      PATH: `${YTDLP_DIR}${delimiter}${process.env.PATH ?? ""}`,
+    };
+
     this.proc = spawn(
       this.mpvBin,
       [
@@ -63,7 +71,7 @@ export class Player extends EventEmitter {
         `--volume=${this.state.volume}`,
         `--input-ipc-server=${this.socketPath}`,
       ],
-      { stdio: "ignore" },
+      { stdio: "ignore", env },
     );
 
     this.proc.on("exit", () => this.emit("exit"));
