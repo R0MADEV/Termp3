@@ -200,11 +200,13 @@ function Modal({
   title,
   cols,
   rows,
+  width,
   children,
 }: {
   title: string;
   cols: number;
   rows: number;
+  width?: number;
   children: React.ReactNode;
 }) {
   const accent = theme().accent;
@@ -216,7 +218,7 @@ function Modal({
         flexDirection="column"
         paddingX={2}
         paddingY={1}
-        width={Math.min(cols - 4, 60)}
+        width={width ?? Math.min(cols - 4, 60)}
       >
         <Text bold color={accent}>
           {title}
@@ -232,19 +234,37 @@ function Modal({
 function PickList({
   options,
   selected,
+  maxVisible,
 }: {
   options: string[];
   selected: number;
+  maxVisible?: number;
 }) {
   const accent = theme().accent;
+  const max = maxVisible && maxVisible < options.length ? maxVisible : options.length;
+  const start =
+    max < options.length
+      ? Math.max(0, Math.min(selected - Math.floor(max / 2), options.length - max))
+      : 0;
+  const visible = options.slice(start, start + max);
   return (
     <Box flexDirection="column">
-      {options.map((o, i) => (
-        <Text key={i} color={i === selected ? accent : undefined} bold={i === selected}>
-          {i === selected ? "› " : "  "}
-          {o}
-        </Text>
-      ))}
+      {start > 0 && <Text dimColor> ▲ …</Text>}
+      {visible.map((o, i) => {
+        const idx = start + i;
+        return (
+          <Text
+            key={idx}
+            color={idx === selected ? accent : undefined}
+            bold={idx === selected}
+            wrap="truncate"
+          >
+            {idx === selected ? "› " : "  "}
+            {o}
+          </Text>
+        );
+      })}
+      {start + max < options.length && <Text dimColor> ▼ …</Text>}
       <Box marginTop={1}>
         <Text dimColor>↑↓ · ↵ select · esc cancel</Text>
       </Box>
@@ -700,11 +720,14 @@ function renderOverlay(
   playlists: string[],
 ): React.ReactElement | null {
   const accent = theme().accent;
+  const maxVisible = Math.max(3, rows - 9);
+  const wide = Math.min(cols - 6, 96);
   if (overlay.kind === "settings") {
     return (
       <Modal title={t("ui.settingsLabel").trim()} cols={cols} rows={rows}>
         <PickList
           selected={sel}
+          maxVisible={maxVisible}
           options={[t("ui.optLanguage"), t("ui.optSearch"), t("ui.optPlaylist"), t("ui.optTheme")]}
         />
       </Modal>
@@ -713,35 +736,47 @@ function renderOverlay(
   if (overlay.kind === "theme") {
     return (
       <Modal title={t("ui.themesLabel").trim()} cols={cols} rows={rows}>
-        <PickList selected={sel} options={listThemes()} />
+        <PickList selected={sel} maxVisible={maxVisible} options={listThemes()} />
       </Modal>
     );
   }
   if (overlay.kind === "lang") {
     return (
       <Modal title={t("ui.langLabel").trim()} cols={cols} rows={rows}>
-        <PickList selected={sel} options={SUPPORTED_LOCALES.map((l) => LOCALE_NAMES[l])} />
+        <PickList
+          selected={sel}
+          maxVisible={maxVisible}
+          options={SUPPORTED_LOCALES.map((l) => LOCALE_NAMES[l])}
+        />
       </Modal>
     );
   }
   if (overlay.kind === "playlists") {
     return (
-      <Modal title={t("ui.playlistsLabel").trim()} cols={cols} rows={rows}>
-        <PickList selected={sel} options={playlists} />
+      <Modal title={t("ui.playlistsLabel").trim()} cols={cols} rows={rows} width={wide}>
+        <PickList selected={sel} maxVisible={maxVisible} options={playlists} />
       </Modal>
     );
   }
   if (overlay.kind === "searchLimit") {
     return (
       <Modal title={t("ui.searchLimitLabel").trim()} cols={cols} rows={rows}>
-        <PickList selected={sel} options={SEARCH_PRESETS.map((n) => t("ui.resultsCount", { n }))} />
+        <PickList
+          selected={sel}
+          maxVisible={maxVisible}
+          options={SEARCH_PRESETS.map((n) => t("ui.resultsCount", { n }))}
+        />
       </Modal>
     );
   }
   if (overlay.kind === "searchResults") {
     return (
-      <Modal title={t("ui.resultsLabel").trim()} cols={cols} rows={rows}>
-        <PickList selected={sel} options={overlay.results.map((r) => r.title)} />
+      <Modal title={t("ui.resultsLabel").trim()} cols={cols} rows={rows} width={wide}>
+        <PickList
+          selected={sel}
+          maxVisible={maxVisible}
+          options={overlay.results.map((r) => r.title)}
+        />
       </Modal>
     );
   }
@@ -749,10 +784,12 @@ function renderOverlay(
     const prompt = overlay.kind === "searchInput" ? t("ui.searchPrompt") : t("ui.addPrompt");
     const title = overlay.kind === "searchInput" ? t("ui.searchLabel") : t("ui.addLabel");
     return (
-      <Modal title={title.trim()} cols={cols} rows={rows}>
+      <Modal title={title.trim()} cols={cols} rows={rows} width={wide}>
         <Text>{prompt}</Text>
         <Box marginTop={1}>
-          <Text color={accent}>{input}</Text>
+          <Text color={accent} wrap="truncate-start">
+            {input}
+          </Text>
           <Text color={accent}>▌</Text>
         </Box>
       </Modal>
