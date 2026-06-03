@@ -365,18 +365,14 @@ function App({
   const innerW = cols - 2;
 
   const sideItems = playlists.map((name) => (
-    <Text key={name} color={name === activePlaylist() ? accent : undefined}>
+    <Text key={name} color={accent} bold={name === activePlaylist()}>
       {name === activePlaylist() ? "▶ " : "  "}
       {name.slice(0, SIDEBAR_W - 6)}
     </Text>
   ));
 
   const trackItems = tracks.map((tr, i) => (
-    <Text
-      key={i}
-      color={i === current ? accent : undefined}
-      dimColor={!tr.resolved}
-    >
+    <Text key={i} color={accent} bold={i === current} dimColor={!tr.resolved}>
       {i === current ? "▶ " : "  "}
       {tr.title.slice(0, cols - SIDEBAR_W - 8)}
     </Text>
