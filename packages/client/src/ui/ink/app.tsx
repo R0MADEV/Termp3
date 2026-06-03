@@ -38,7 +38,7 @@ import {
 } from "../../i18n.ts";
 import { loadSettings, saveSettings } from "../../config.ts";
 import { ensureYtDlp } from "../../ytdlp.ts";
-import { AudioAnalyzer, BANDS } from "../../audio.ts";
+import { AudioAnalyzer, BANDS, WAVE_POINTS } from "../../audio.ts";
 
 const SIDEBAR_W = 24;
 const SPECTRUM_H = 6;
@@ -79,28 +79,135 @@ function useTermSize() {
 
 // --- presentational pieces ---
 
-function Spectrum({ spec, playing }: { spec: number[]; playing: boolean }) {
+export const VIZ_MODES = ["bars", "mirror", "smooth", "scope", "plasma"] as const;
+const LEVELS = "▁▂▃▄▅▆▇█";
+
+function hslToHex(h: number, s: number, l: number): string {
+  s /= 100;
+  l /= 100;
+  const k = (n: number) => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  const f = (n: number) => {
+    const c = l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
+    return Math.round(255 * c)
+      .toString(16)
+      .padStart(2, "0");
+  };
+  return `#${f(0)}${f(8)}${f(4)}`;
+}
+
+function vizBars(spec: number[]): React.ReactNode[] {
   const [low, mid, high] = theme().spectrum;
-  const rows = [];
+  const rows: React.ReactNode[] = [];
+  for (let level = SPECTRUM_H - 1; level >= 0; level--) {
+    const color = level >= 4 ? high : level >= 2 ? mid : low;
+    let line = "";
+    for (let i = 0; i < SPECTRUM_COLS; i++) line += (spec[i] ?? 0) > level ? "█" : " ";
+    rows.push(<Text key={level} color={color}>{line}</Text>);
+  }
+  return rows;
+}
+
+function vizSmooth(spec: number[]): React.ReactNode[] {
+  const [low, mid, high] = theme().spectrum;
+  const rows: React.ReactNode[] = [];
   for (let level = SPECTRUM_H - 1; level >= 0; level--) {
     const color = level >= 4 ? high : level >= 2 ? mid : low;
     let line = "";
     for (let i = 0; i < SPECTRUM_COLS; i++) {
-      const h = playing ? (spec[i] ?? 0) : 0;
-      line += h > level ? "█" : " ";
+      const h = spec[i] ?? 0;
+      if (h >= level + 1) line += "█";
+      else if (h > level) line += LEVELS[Math.min(7, Math.floor((h - level) * 8))];
+      else line += " ";
     }
-    rows.push(
-      <Text key={level} color={color}>
-        {line}
-      </Text>,
-    );
+    rows.push(<Text key={level} color={color}>{line}</Text>);
   }
+  return rows;
+}
+
+function vizMirror(spec: number[]): React.ReactNode[] {
+  const [low, mid, high] = theme().spectrum;
+  const cy = (SPECTRUM_H - 1) / 2;
+  const rows: React.ReactNode[] = [];
+  for (let r = 0; r < SPECTRUM_H; r++) {
+    const dist = Math.abs(r - cy);
+    const color = dist >= 2.5 ? high : dist >= 1 ? mid : low;
+    let line = "";
+    for (let i = 0; i < SPECTRUM_COLS; i++) {
+      const half = ((spec[i] ?? 0) / SPECTRUM_H) * (SPECTRUM_H / 2) + 0.3;
+      line += dist <= half ? "█" : " ";
+    }
+    rows.push(<Text key={r} color={color}>{line}</Text>);
+  }
+  return rows;
+}
+
+function vizScope(wave: number[]): React.ReactNode[] {
+  const accent = theme().accent;
+  const grid: string[][] = Array.from({ length: SPECTRUM_H }, () =>
+    Array(SPECTRUM_COLS).fill(" "),
+  );
+  for (let x = 0; x < SPECTRUM_COLS; x++) {
+    const v = wave[Math.floor((x / SPECTRUM_COLS) * wave.length)] ?? 0;
+    const row = Math.max(
+      0,
+      Math.min(SPECTRUM_H - 1, Math.round((1 - (v + 1) / 2) * (SPECTRUM_H - 1))),
+    );
+    grid[row]![x] = "●";
+  }
+  return grid.map((cells, r) => (
+    <Text key={r} color={accent}>{cells.join("")}</Text>
+  ));
+}
+
+function vizPlasma(frame: number, energy: number): React.ReactNode[] {
+  const rows: React.ReactNode[] = [];
+  for (let r = 0; r < SPECTRUM_H; r++) {
+    const spans: React.ReactNode[] = [];
+    for (let x = 0; x < SPECTRUM_COLS; x++) {
+      const v =
+        Math.sin(x * 0.3 + frame * 0.15) +
+        Math.sin(r * 0.6 + frame * 0.1) +
+        Math.sin((x + r) * 0.2 + frame * 0.2);
+      const hue = (((v + 3) / 6) * 360 + frame * 3) % 360;
+      const color = hslToHex(hue, 85, 30 + energy * 45);
+      spans.push(<Text key={x} color={color}>█</Text>);
+    }
+    rows.push(<Box key={r}>{spans}</Box>);
+  }
+  return rows;
+}
+
+function Visualizer({
+  mode,
+  spec,
+  wave,
+  frame,
+  playing,
+}: {
+  mode: string;
+  spec: number[];
+  wave: number[];
+  frame: number;
+  playing: boolean;
+}) {
+  let rows: React.ReactNode[];
+  if (mode === "mirror") rows = vizMirror(spec);
+  else if (mode === "smooth") rows = vizSmooth(spec);
+  else if (mode === "scope") rows = vizScope(wave);
+  else if (mode === "plasma") {
+    const energy = spec.reduce((a, b) => a + b, 0) / (spec.length * SPECTRUM_H);
+    rows = vizPlasma(frame, playing ? Math.max(0.15, energy) : 0.1);
+  } else rows = vizBars(spec);
   return <Box flexDirection="column">{rows}</Box>;
 }
 
 function NowPlaying({
   state,
   spec,
+  wave,
+  frame,
+  mode,
   loading,
   shuffle,
   repeat,
@@ -108,6 +215,9 @@ function NowPlaying({
 }: {
   state: Player["state"];
   spec: number[];
+  wave: number[];
+  frame: number;
+  mode: string;
   loading: boolean;
   shuffle: boolean;
   repeat: "off" | "all" | "one";
@@ -140,7 +250,13 @@ function NowPlaying({
         </Text>
       </Box>
       <Box marginTop={1}>
-        <Spectrum spec={spec} playing={!!state.url && !state.paused} />
+        <Visualizer
+          mode={mode}
+          spec={spec}
+          wave={wave}
+          frame={frame}
+          playing={!!state.url && !state.paused}
+        />
       </Box>
       <Box marginTop={1}>
         <Text color={accent}>{bar(ratio, progW)}</Text>
@@ -311,6 +427,9 @@ function App({
   const [current, setCurrent] = useState(-1);
   const [state, setState] = useState({ ...player.state });
   const [spec, setSpec] = useState<number[]>(new Array(SPECTRUM_COLS).fill(0));
+  const [wave, setWave] = useState<number[]>(new Array(WAVE_POINTS).fill(0));
+  const [frame, setFrame] = useState(0);
+  const [mode, setMode] = useState<string>(loadSettings().vizMode ?? "bars");
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState<"off" | "all" | "one">("all");
   const [mutedVol, setMutedVol] = useState<number | null>(null);
@@ -410,14 +529,23 @@ function App({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [player, tracks, current, shuffle, repeat]);
 
-  // Real frequency bands from the audio analyzer.
+  // Real frequency bands + waveform from the audio analyzer.
   useEffect(() => {
     const onBands = (b: number[]) => setSpec(b.map((v) => v * SPECTRUM_H));
+    const onWave = (w: number[]) => setWave(w);
     analyzer.on("bands", onBands);
+    analyzer.on("wave", onWave);
     return () => {
       analyzer.off("bands", onBands);
+      analyzer.off("wave", onWave);
     };
   }, [analyzer]);
+
+  // Animation frame counter (drives the plasma mode).
+  useEffect(() => {
+    const id = setInterval(() => setFrame((f) => f + 1), 120);
+    return () => clearInterval(id);
+  }, []);
 
   // Decay the bars while paused/stopped.
   useEffect(() => {
@@ -569,6 +697,13 @@ function App({
     if (ch === "s") return setShuffle((v) => !v);
     if (ch === "r")
       return setRepeat((v) => (v === "off" ? "all" : v === "all" ? "one" : "off"));
+    if (ch === "v") {
+      const idx = (VIZ_MODES as readonly string[]).indexOf(mode);
+      const m = VIZ_MODES[(idx + 1) % VIZ_MODES.length]!;
+      setMode(m);
+      saveSettings({ vizMode: m });
+      return;
+    }
     if (ch === "m") return toggleMute();
     if (ch === "+" || ch === "=") return setVol(player.state.volume + 5);
     if (ch === "-") return setVol(player.state.volume - 5);
@@ -702,6 +837,9 @@ function App({
       <NowPlaying
         state={state}
         spec={spec}
+        wave={wave}
+        frame={frame}
+        mode={mode}
         loading={loading}
         shuffle={shuffle}
         repeat={repeat}
@@ -729,8 +867,8 @@ function App({
       </Box>
       <Box paddingX={1}>
         <Text dimColor>
-          ↑↓ · ↵ play · space · n/p · s/r · / search · a add · d del · o settings
-          · ? help · q quit
+          ↑↓ · ↵ play · space · n/p · s/r · v viz ({mode}) · / search · a add ·
+          d del · o settings · ? help · q quit
         </Text>
       </Box>
     </Box>

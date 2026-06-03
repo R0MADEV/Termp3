@@ -14,6 +14,17 @@ import { ytDlpCommand } from "./ytdlp.ts";
 const SAMPLE_RATE = 22050;
 const FFT_SIZE = 1024;
 export const BANDS = 36;
+export const WAVE_POINTS = 64;
+
+/** Downsamples a PCM frame to a normalized waveform (-1..1) for the scope. */
+function waveFrom(buf: Buffer): number[] {
+  const wave: number[] = [];
+  for (let i = 0; i < WAVE_POINTS; i++) {
+    const idx = Math.floor((i / WAVE_POINTS) * FFT_SIZE);
+    wave.push(buf.readInt16LE(idx * 2) / 32768);
+  }
+  return wave;
+}
 
 const hann = new Float64Array(FFT_SIZE);
 for (let i = 0; i < FFT_SIZE; i++) {
@@ -146,6 +157,7 @@ export class AudioAnalyzer extends EventEmitter {
         const frame = this.buf.subarray(0, bytesPerFrame);
         this.buf = this.buf.subarray(bytesPerFrame);
         this.emit("bands", analyzeFrame(frame, this.peak));
+        this.emit("wave", waveFrom(frame));
       }
     });
   }

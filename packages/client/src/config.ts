@@ -68,6 +68,7 @@ export interface Settings {
   volume?: number;
   activePlaylist?: string;
   theme?: string;
+  vizMode?: string;
   // Resume: last track + position within the last playlist.
   lastPlaylist?: string;
   lastUrl?: string;
