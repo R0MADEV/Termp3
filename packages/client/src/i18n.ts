@@ -100,8 +100,9 @@ CONTROLS (interface):
     "ui.help":
       " {green-fg}↑↓{/} nav  {green-fg}↵{/} play  {green-fg}space{/} pause  {green-fg}n/p{/} next/prev  {green-fg}/{/} search  {green-fg}?{/} help  {green-fg}q{/} quit",
     "ui.helpLabel": " Keys ",
-    "ui.helpScreen": `  {green-fg}↑ ↓{/}      navigate
-  {green-fg}Enter{/}    play selected
+    "ui.helpScreen": `  {green-fg}Tab{/}      switch panel (tracks / playlists)
+  {green-fg}↑ ↓{/}      navigate
+  {green-fg}Enter{/}    play selected (or open playlist)
   {green-fg}Space{/}    pause / resume
   {green-fg}← →{/}      seek 5s
   {green-fg}n / p{/}    next / previous
@@ -208,8 +209,9 @@ CONTROLES (interfaz):
     "ui.help":
       " {green-fg}↑↓{/} nav  {green-fg}↵{/} play  {green-fg}espacio{/} pausa  {green-fg}n/p{/} sig/ant  {green-fg}/{/} buscar  {green-fg}?{/} ayuda  {green-fg}q{/} salir",
     "ui.helpLabel": " Teclas ",
-    "ui.helpScreen": `  {green-fg}↑ ↓{/}      navegar
-  {green-fg}Enter{/}    reproducir seleccionada
+    "ui.helpScreen": `  {green-fg}Tab{/}      cambiar panel (canciones / listas)
+  {green-fg}↑ ↓{/}      navegar
+  {green-fg}Enter{/}    reproducir seleccionada (o abrir lista)
   {green-fg}Espacio{/}  pausa / reanudar
   {green-fg}← →{/}      avanzar/retroceder 5s
   {green-fg}n / p{/}    siguiente / anterior

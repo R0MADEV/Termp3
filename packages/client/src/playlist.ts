@@ -104,7 +104,9 @@ export async function fetchPlaylist(
     "%(playlist_title)s",
     url,
   ]);
-  const name = nameOut.split(/\r?\n/)[0]?.trim() || "YouTube playlist";
+  // yt-dlp returns "NA" when a playlist has no title.
+  const raw = nameOut.split(/\r?\n/)[0]?.trim();
+  const name = !raw || raw === "NA" ? "YouTube playlist" : raw;
   return { name, entries: parseEntries(out) };
 }
 
@@ -157,12 +159,21 @@ export function listPlaylists(): string[] {
     .sort();
 }
 
-/** Creates (or overwrites) a named playlist with the given URLs. Returns its name. */
+/** Finds a free playlist name, adding " 2", " 3"… so nothing is overwritten. */
+function uniquePlaylistName(name: string): string {
+  const base = sanitizeName(name);
+  if (!existsSync(playlistFile(base))) return base;
+  let n = 2;
+  while (existsSync(playlistFile(`${base} ${n}`))) n++;
+  return `${base} ${n}`;
+}
+
+/** Creates a new named playlist with the given URLs. Returns the name used. */
 export function createPlaylist(name: string, urls: string[]): string {
   ensureConfig();
-  const clean = sanitizeName(name);
-  writeFileSync(playlistFile(clean), `${urls.join("\n")}\n`);
-  return clean;
+  const unique = uniquePlaylistName(name);
+  writeFileSync(playlistFile(unique), `${urls.join("\n")}\n`);
+  return unique;
 }
 
 // --- active playlist contents ---

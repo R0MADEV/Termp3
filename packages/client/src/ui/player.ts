@@ -73,11 +73,15 @@ function bigTime(time: string): [string, string, string] {
   return rows;
 }
 
+const SIDEBAR_W = 26; // width of the playlists sidebar
+
 export class PlayerUI {
   private screen: blessed.Widgets.Screen;
   private main: blessed.Widgets.BoxElement;
   private list: blessed.Widgets.ListElement;
+  private sidebar: blessed.Widgets.ListElement;
   private status: blessed.Widgets.BoxElement;
+  private focused: "tracks" | "sidebar" = "tracks";
 
   private marqueeOffset = 0;
   private spectrum: number[] = new Array(BAR_COUNT).fill(0);
@@ -111,9 +115,27 @@ export class PlayerUI {
       style: { border: { fg: "green" }, fg: "green", bg: "black" },
     });
 
-    this.list = blessed.list({
+    this.sidebar = blessed.list({
       top: 14,
       left: 0,
+      width: SIDEBAR_W,
+      bottom: 1,
+      tags: true,
+      keys: true,
+      vi: true,
+      border: { type: "line" },
+      label: t("ui.playlistsLabel"),
+      style: {
+        border: { fg: "gray" },
+        fg: "green",
+        bg: "black",
+        selected: { bg: "green", fg: "black" },
+      },
+    });
+
+    this.list = blessed.list({
+      top: 14,
+      left: SIDEBAR_W,
       right: 0,
       bottom: 1,
       tags: true,
@@ -141,9 +163,11 @@ export class PlayerUI {
     });
 
     this.screen.append(this.main);
+    this.screen.append(this.sidebar);
     this.screen.append(this.list);
     this.screen.append(this.status);
 
+    this.refreshSidebar();
     this.refreshList();
     this.bindKeys();
 
@@ -189,6 +213,40 @@ export class PlayerUI {
     });
     this.list.setItems(items);
     this.list.setLabel(t("ui.playlist", { n: this.tracks.length }));
+    this.screen.render();
+  }
+
+  /** Redraws the playlists sidebar, marking the active one. */
+  private refreshSidebar() {
+    const names = listPlaylists();
+    const active = activePlaylist();
+    this.sidebar.setItems(
+      names.map((n) => (n === active ? `{green-fg}▶{/} ${n}` : `  ${n}`)),
+    );
+    const idx = names.indexOf(active);
+    if (idx >= 0) this.sidebar.select(idx);
+    this.screen.render();
+  }
+
+  /** Switches the active playlist and reloads its tracks (shared logic). */
+  private switchToPlaylist(name: string) {
+    setActivePlaylist(name);
+    this.currentIndex = -1;
+    this.tracks = loadPlaylist();
+    this.refreshList();
+    this.refreshSidebar();
+    resolveTitles(this.tracks, (i, tr) => this.updateTrack(i, tr)).catch(
+      () => {},
+    );
+  }
+
+  /** Moves keyboard focus between the tracks list and the sidebar. */
+  private focusPanel(which: "tracks" | "sidebar") {
+    this.focused = which;
+    const tracksActive = which === "tracks";
+    this.list.style.border.fg = tracksActive ? "green" : "gray";
+    this.sidebar.style.border.fg = tracksActive ? "gray" : "green";
+    (tracksActive ? this.list : this.sidebar).focus();
     this.screen.render();
   }
 
@@ -614,6 +672,7 @@ export class PlayerUI {
             resolved: true,
           }));
           this.refreshList();
+          this.refreshSidebar();
           this.playIndex(0, true);
           return this.flashThenEnd(
             t("ui.importedTo", { n: entries.length, name: created }),
@@ -748,14 +807,7 @@ export class PlayerUI {
     picker.on("select", (_item, index) => {
       const name = names[index];
       picker.destroy();
-      if (!name) return this.endModal();
-      setActivePlaylist(name);
-      this.currentIndex = -1;
-      this.tracks = loadPlaylist();
-      this.refreshList();
-      resolveTitles(this.tracks, (i, tr) => this.updateTrack(i, tr)).catch(
-        () => {},
-      );
+      if (name) this.switchToPlaylist(name);
       this.endModal();
     });
     picker.key(["escape"], () => {
@@ -857,17 +909,28 @@ export class PlayerUI {
   }
 
   private bindKeys() {
-    this.list.focus();
+    this.focusPanel("tracks");
 
     this.list.on("select", (_item, index) => {
       if (this.modal) return; // ignore stray Enter while a popup is open
       this.playIndex(index, true); // manual choice resets the error guard
     });
 
+    this.sidebar.on("select", (_item, index) => {
+      if (this.modal) return;
+      const name = listPlaylists()[index];
+      if (name) this.switchToPlaylist(name);
+    });
+
     // Global player controls are ignored while a popup (modal) is open.
     const g = (fn: () => void) => () => {
       if (!this.modal) fn();
     };
+
+    // Tab switches focus between the playlist and the sidebar.
+    this.screen.key(["tab"], g(() => this.focusPanel(
+      this.focused === "tracks" ? "sidebar" : "tracks",
+    )));
 
     this.screen.key(["space"], g(() => this.player.togglePause()));
     this.screen.key(["right"], g(() => this.player.seek(5)));
