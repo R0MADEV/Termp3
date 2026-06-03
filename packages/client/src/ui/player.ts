@@ -217,14 +217,21 @@ export class PlayerUI {
 
   /** Re-applies the current theme to the persistent UI and re-renders. */
   private applyTheme() {
-    this.main.style = this.boxStyle();
-    this.list.style = this.boxStyle();
-    this.sidebar.style = this.boxStyle();
+    const a = theme().accent;
+    // Mutate styles in place (replacing the object leaves blessed artifacts).
+    for (const el of [this.main, this.list, this.sidebar]) {
+      el.style.fg = a;
+      el.style.border.fg = a;
+      el.style.selected.bg = a;
+      el.style.item.fg = a;
+    }
     this.status.setContent(themed(t("ui.help")));
     this.focusPanel(this.focused); // re-colors borders for the focused panel
     this.refreshSidebar();
     this.refreshList();
     this.renderMain();
+    this.screen.realloc(); // force a full repaint to clear any leftovers
+    this.screen.render();
   }
 
   private refreshList() {
