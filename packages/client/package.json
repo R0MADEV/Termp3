@@ -11,8 +11,9 @@
   ],
   "scripts": {
     "dev": "bun run src/cli.ts",
-    "build": "bun build src/cli.ts --target node --outfile dist/cli.js",
-    "build:binary": "bun build src/cli.ts --compile --outfile dist/termp3"
+    "build": "bun build src/cli.ts --target node --outfile dist/cli.js --external blessed",
+    "build:binary": "bun build src/cli.ts --compile --outfile dist/termp3",
+    "prepublishOnly": "bun run build"
   },
   "keywords": [
     "terminal",

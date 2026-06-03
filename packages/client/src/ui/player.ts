@@ -69,6 +69,8 @@ export class PlayerUI {
   private spectrum: number[] = new Array(BAR_COUNT).fill(0);
   private currentIndex = -1;
   private modal = false; // true while a popup (add URL / language) is open
+  private playErrors = 0; // consecutive failed tracks (anti-loop guard)
+  private errorMsg: string | null = null; // transient "can't play" banner
 
   constructor(
     private player: Player,
@@ -130,6 +132,24 @@ export class PlayerUI {
     // Visual refresh (marquee + visualizer + timers).
     setInterval(() => this.tick(), 120);
     this.player.on("state", () => this.renderMain());
+    // Auto-advance on natural end ("eof"); skip on "error" with a loop guard.
+    this.player.on("ended", (reason: string) => {
+      if (reason === "eof") {
+        this.playErrors = 0;
+        this.next();
+      } else if (reason === "error") {
+        const failed = this.tracks[this.currentIndex];
+        this.playErrors++;
+        // Try the next track, but stop if every track has failed in a row.
+        if (this.playErrors < Math.max(1, this.tracks.length)) {
+          this.errorMsg = t("ui.cantPlay", { title: failed?.title ?? "?" });
+          this.next();
+        } else {
+          this.errorMsg = t("ui.allFailed");
+        }
+        this.renderMain();
+      }
+    });
   }
 
   private refreshList() {
@@ -153,13 +173,17 @@ export class PlayerUI {
     this.refreshList();
   }
 
-  private playIndex(i: number) {
+  private playIndex(i: number, resetErrors = false) {
     const track = this.tracks[i];
     if (!track) return;
+    if (resetErrors) this.playErrors = 0;
     this.currentIndex = i;
     this.player.load(track.url);
     this.refreshList();
+    // Move the list highlight to follow the track that's now playing.
+    this.list.select(i);
     this.renderMain();
+    this.screen.render();
   }
 
   private next() {
@@ -214,6 +238,8 @@ export class PlayerUI {
 
   private renderMain() {
     const s = this.player.state;
+    // A track started playing → clear any transient error message.
+    if (this.errorMsg && s.position > 0) this.errorMsg = null;
     const width = (this.main.width as number) - 4;
     const inner = width - 2;
     const title = s.title ?? t("ui.noSong");
@@ -258,8 +284,12 @@ export class PlayerUI {
 
     const spectrum = this.renderSpectrumRows(inner).map((r) => `  ${r}`);
 
+    const firstLine = this.errorMsg
+      ? `  {red-fg}${this.marquee(this.errorMsg, inner - 2)}{/}`
+      : `  {green-fg}♪{/} {bold}${this.marquee(title, inner - 4)}{/}`;
+
     const content = [
-      `  {green-fg}♪{/} {bold}${this.marquee(title, inner - 4)}{/}`,
+      firstLine,
       "",
       ...lcdRows,
       "",
@@ -394,7 +424,7 @@ export class PlayerUI {
 
     this.list.on("select", (_item, index) => {
       if (this.modal) return; // ignore stray Enter while a popup is open
-      this.playIndex(index);
+      this.playIndex(index, true); // manual choice resets the error guard
     });
 
     // Global player controls are ignored while a popup (modal) is open.

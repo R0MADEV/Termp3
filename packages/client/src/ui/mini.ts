@@ -29,6 +29,8 @@ export class MiniUI {
   private marqueeOffset = 0;
   private spectrum: number[] = new Array(SPEC_COLS).fill(0);
   private currentIndex = -1;
+  private playErrors = 0; // consecutive failed tracks (anti-loop guard)
+  private errorMsg: string | null = null; // transient "can't play" banner
 
   constructor(
     private player: Player,
@@ -56,6 +58,23 @@ export class MiniUI {
 
     setInterval(() => this.tick(), 120);
     this.player.on("state", () => this.render());
+    // Auto-advance on natural end ("eof"); skip on "error" with a loop guard.
+    this.player.on("ended", (reason: string) => {
+      if (reason === "eof") {
+        this.playErrors = 0;
+        this.next();
+      } else if (reason === "error") {
+        const failed = this.tracks[this.currentIndex];
+        this.playErrors++;
+        if (this.playErrors < Math.max(1, this.tracks.length)) {
+          this.errorMsg = t("ui.cantPlay", { title: failed?.title ?? "?" });
+          this.next();
+        } else {
+          this.errorMsg = t("ui.allFailed");
+        }
+        this.render();
+      }
+    });
   }
 
   private playIndex(i: number) {
@@ -111,12 +130,21 @@ export class MiniUI {
 
   private render() {
     const s = this.player.state;
+    // A track started playing → clear any transient error message.
+    if (this.errorMsg && s.position > 0) this.errorMsg = null;
+
+    const total = (this.bar.width as number) - 2;
+    if (this.errorMsg) {
+      this.bar.setContent(` {red-fg}${this.marquee(this.errorMsg, total - 2)}{/} `);
+      this.screen.render();
+      return;
+    }
+
     const icon = s.paused ? "⏸" : s.url ? "▶" : "■";
     const time = fmtTime(s.position);
     const spec = `{green-fg}${this.miniSpectrum()}{/}`;
 
     // Width available for the title = total - (icons + time + spec + margins)
-    const total = (this.bar.width as number) - 2;
     const fixed = 2 /*icon*/ + 1 + time.length + 2 + SPEC_COLS + 4;
     const titleW = Math.max(8, total - fixed);
     const title = this.marquee(s.title ?? t("ui.noSong"), titleW);

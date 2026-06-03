@@ -106,7 +106,14 @@ export class Player extends EventEmitter {
       if (!line) continue;
       try {
         const msg = JSON.parse(line);
-        if (msg.event === "property-change") this.onProperty(msg.name, msg.data);
+        if (msg.event === "property-change") {
+          this.onProperty(msg.name, msg.data);
+        } else if (msg.event === "end-file") {
+          // reason: "eof" (finished), "stop"/"quit" (we triggered it), "error"
+          this.emit("ended", msg.reason as string, msg.file_error as
+            | string
+            | undefined);
+        }
       } catch {
         // non-JSON line: ignore it
       }
