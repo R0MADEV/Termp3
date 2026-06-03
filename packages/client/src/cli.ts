@@ -11,7 +11,7 @@ import { Player } from "./player.ts";
 import { loadPlaylist, resolveTitles, addUrl } from "./playlist.ts";
 import { PLAYLISTS_DIR, loadSettings, saveSettings } from "./config.ts";
 import { MiniUI } from "./ui/mini.ts";
-import { runInkUI } from "./ui/ink/app.tsx";
+import { runInkUI, controlBus } from "./ui/ink/app.tsx";
 import { startTitleBroadcast } from "./title.ts";
 import { startStatusBroadcast, readStatus } from "./status.ts";
 import { startControlServer, sendControl } from "./control.ts";
@@ -66,8 +66,15 @@ async function launchUI() {
   // "Now playing" visible in any terminal (title) and in tmux/zellij bars (file).
   startTitleBroadcast(player);
   startStatusBroadcast(player);
+  // Control from another tab → forwarded to the Ink UI via the command bus.
+  startControlServer({
+    pause: () => controlBus.emit("pause"),
+    next: () => controlBus.emit("next"),
+    prev: () => controlBus.emit("prev"),
+    volume: (d) => controlBus.emit("volume", d),
+  });
 
-  // Ink prototype UI (ink-ui branch).
+  // Ink UI.
   runInkUI(player, tracks);
 }
 
