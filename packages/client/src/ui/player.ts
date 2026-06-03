@@ -217,10 +217,9 @@ export class PlayerUI {
 
   /** Re-applies the current theme to the persistent UI and re-renders. */
   private applyTheme() {
-    const a = theme().accent;
-    this.main.style.border.fg = a;
-    this.list.style.selected.bg = a;
-    this.sidebar.style.selected.bg = a;
+    this.main.style = this.boxStyle();
+    this.list.style = this.boxStyle();
+    this.sidebar.style = this.boxStyle();
     this.status.setContent(themed(t("ui.help")));
     this.focusPanel(this.focused); // re-colors borders for the focused panel
     this.refreshSidebar();
@@ -433,17 +432,17 @@ export class PlayerUI {
     const volBarW = 12;
     const volFilled = Math.round((Math.min(100, s.volume) / 100) * volBarW);
     const volBar =
-      "{${a}-fg}" +
+      `{${a}-fg}` +
       "▉".repeat(volFilled) +
       "{/}{gray-fg}" +
       "░".repeat(volBarW - volFilled) +
       "{/}";
-    const shuf = this.shuffle ? "{${a}-fg}🔀{/}" : "{gray-fg}🔀{/}";
+    const shuf = this.shuffle ? `{${a}-fg}🔀{/}` : "{gray-fg}🔀{/}";
     const rep =
       this.repeat === "one"
-        ? "{${a}-fg}🔂{/}"
+        ? `{${a}-fg}🔂{/}`
         : this.repeat === "all"
-          ? "{${a}-fg}🔁{/}"
+          ? `{${a}-fg}🔁{/}`
           : "{gray-fg}🔁{/}";
     const infoRows = [
       `${playState}   ${shuf} ${rep}`,
@@ -460,7 +459,7 @@ export class PlayerUI {
     const ratio = s.duration > 0 ? Math.min(1, s.position / s.duration) : 0;
     const filled = Math.round(ratio * barW);
     const progress =
-      "{${a}-fg}" +
+      `{${a}-fg}` +
       "━".repeat(filled) +
       "◉{/}{gray-fg}" +
       "━".repeat(Math.max(0, barW - filled)) +
