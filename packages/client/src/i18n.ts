@@ -86,7 +86,7 @@ CONTROLS (interface):
     "ui.state.pause": "PAUSE",
     "ui.state.stop": "STOP",
     "ui.help":
-      " {green-fg}↑↓{/} navigate  {green-fg}↵{/} play  {green-fg}space{/} pause  {green-fg}←→{/} seek  {green-fg}n/p{/} next/prev  {green-fg}a{/} add  {green-fg}l{/} lang  {green-fg}+/-{/} vol  {green-fg}q{/} quit",
+      " {green-fg}↑↓{/} navigate  {green-fg}↵{/} play  {green-fg}space{/} pause  {green-fg}←→{/} seek  {green-fg}n/p{/} next/prev  {green-fg}a{/} add  {green-fg}d{/} del  {green-fg}l{/} lang  {green-fg}+/-{/} vol  {green-fg}q{/} quit",
     "ui.langLabel": " Language ",
   },
   es: {
@@ -157,7 +157,7 @@ CONTROLES (interfaz):
     "ui.state.pause": "PAUSA",
     "ui.state.stop": "STOP",
     "ui.help":
-      " {green-fg}↑↓{/} navegar  {green-fg}↵{/} play  {green-fg}espacio{/} pausa  {green-fg}←→{/} seek  {green-fg}n/p{/} sig/ant  {green-fg}a{/} anadir  {green-fg}l{/} idioma  {green-fg}+/-{/} vol  {green-fg}q{/} salir",
+      " {green-fg}↑↓{/} navegar  {green-fg}↵{/} play  {green-fg}espacio{/} pausa  {green-fg}←→{/} seek  {green-fg}n/p{/} sig/ant  {green-fg}a{/} anadir  {green-fg}d{/} borrar  {green-fg}l{/} idioma  {green-fg}+/-{/} vol  {green-fg}q{/} salir",
     "ui.langLabel": " Idioma ",
   },
 };

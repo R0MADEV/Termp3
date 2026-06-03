@@ -37,6 +37,17 @@ export function addUrl(
   return { added: true };
 }
 
+/** Removes a URL/path line from playlist.txt. Returns true if it was found. */
+export function removeUrl(url: string): boolean {
+  ensureConfig();
+  const target = url.trim();
+  const lines = readFileSync(PLAYLIST_FILE, "utf8").split(/\r?\n/);
+  const kept = lines.filter((l) => l.trim() !== target);
+  if (kept.length === lines.length) return false;
+  writeFileSync(PLAYLIST_FILE, kept.join("\n"));
+  return true;
+}
+
 /** Reads playlist.txt → list of tracks with provisional titles. */
 export function loadPlaylist(): Track[] {
   ensureConfig();

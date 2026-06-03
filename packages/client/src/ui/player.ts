@@ -12,7 +12,7 @@
 import blessed from "blessed";
 import type { Player } from "../player.ts";
 import type { Track } from "../playlist.ts";
-import { addUrl, resolveTitles } from "../playlist.ts";
+import { addUrl, removeUrl, resolveTitles } from "../playlist.ts";
 import {
   t,
   setLocale,
@@ -322,6 +322,24 @@ export class PlayerUI {
     this.renderMain();
   }
 
+  /** Removes the highlighted track from the playlist (list + file). */
+  private deleteSelected() {
+    const i = (this.list as unknown as { selected: number }).selected;
+    const track = this.tracks[i];
+    if (!track) return;
+    removeUrl(track.url);
+    this.tracks.splice(i, 1);
+    // Keep currentIndex pointing at the right track after the removal.
+    if (this.currentIndex === i) this.currentIndex = -1;
+    else if (this.currentIndex > i) this.currentIndex--;
+    this.refreshList();
+    if (this.tracks.length > 0) {
+      this.list.select(Math.min(i, this.tracks.length - 1));
+    }
+    this.renderMain();
+    this.screen.render();
+  }
+
   /** Popup window to paste a URL and add it to the playlist on the fly. */
   private promptAddUrl() {
     const prompt = blessed.prompt({
@@ -438,6 +456,7 @@ export class PlayerUI {
     this.screen.key(["n"], g(() => this.next()));
     this.screen.key(["p"], g(() => this.prev()));
     this.screen.key(["a"], g(() => this.promptAddUrl()));
+    this.screen.key(["d"], g(() => this.deleteSelected()));
     this.screen.key(["l"], g(() => this.promptLanguage()));
     this.screen.key(
       ["+", "="],
