@@ -1,0 +1,20 @@
+{
+  "name": "termp3-monorepo",
+  "private": true,
+  "version": "0.0.1",
+  "description": "termp3 — retro terminal music player with synced rooms and turn-based DJ rotation",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:client": "bun run --cwd packages/client dev",
+    "dev:server": "bun run --cwd packages/server dev",
+    "build": "bun run --cwd packages/client build && bun run --cwd packages/server build",
+    "docker:up": "docker compose up",
+    "docker:down": "docker compose down"
+  },
+  "engines": {
+    "bun": ">=1.3.0"
+  },
+  "license": "MIT"
+}

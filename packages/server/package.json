@@ -1,0 +1,12 @@
+{
+  "name": "termp3-relay",
+  "version": "0.0.1",
+  "description": "Servidor relay de termp3: sincroniza salas y la rotacion de DJ por turnos via WebSocket.",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "build": "bun build src/index.ts --target bun --outfile dist/index.js"
+  },
+  "license": "MIT"
+}

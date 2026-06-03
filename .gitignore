@@ -1,0 +1,8 @@
+node_modules/
+dist/
+*.log
+.env
+.DS_Store
+# binarios descargados en runtime (yt-dlp, etc.)
+bin/
+.termp3/

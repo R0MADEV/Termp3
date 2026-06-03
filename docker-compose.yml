@@ -1,0 +1,11 @@
+services:
+  relay:
+    build:
+      context: .
+      dockerfile: packages/server/Dockerfile
+    image: termp3-relay
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - PORT=3000
+    restart: unless-stopped
