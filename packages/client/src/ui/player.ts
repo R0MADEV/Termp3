@@ -80,6 +80,7 @@ export class PlayerUI {
   private errorMsg: string | null = null; // transient "can't play" banner
   private shuffle = false;
   private repeat: "off" | "all" | "one" = "all";
+  private loading = false; // true between selecting a track and audio starting
 
   constructor(
     private player: Player,
@@ -148,6 +149,7 @@ export class PlayerUI {
         this.advance(true); // respects shuffle / repeat
       } else if (reason === "error") {
         const failed = this.tracks[this.currentIndex];
+        this.loading = false;
         this.playErrors++;
         // Try the next track, but stop if every track has failed in a row.
         if (this.playErrors < Math.max(1, this.tracks.length)) {
@@ -193,6 +195,7 @@ export class PlayerUI {
     if (!track) return;
     if (resetErrors) this.playErrors = 0;
     this.currentIndex = i;
+    this.loading = true; // until audio actually starts (position > 0)
     this.player.load(track.url);
     this.refreshList();
     // Move the list highlight to follow the track that's now playing.
@@ -283,17 +286,22 @@ export class PlayerUI {
 
   private renderMain() {
     const s = this.player.state;
-    // A track started playing → clear any transient error message.
-    if (this.errorMsg && s.position > 0) this.errorMsg = null;
+    // Audio started → clear the loading flag and any transient error message.
+    if (s.position > 0) {
+      this.loading = false;
+      if (this.errorMsg) this.errorMsg = null;
+    }
     const width = (this.main.width as number) - 4;
     const inner = width - 2;
     const title = s.title ?? t("ui.noSong");
     const dur = fmtTime(s.duration);
-    const playState = s.paused
-      ? `{yellow-fg}⏸  ${t("ui.state.pause")}{/}`
-      : s.url
-        ? `{green-fg}▶  ${t("ui.state.play")}{/}`
-        : `{gray-fg}■  ${t("ui.state.stop")}{/}`;
+    const playState = this.loading
+      ? `{yellow-fg}${t("ui.loading")}{/}`
+      : s.paused
+        ? `{yellow-fg}⏸  ${t("ui.state.pause")}{/}`
+        : s.url
+          ? `{green-fg}▶  ${t("ui.state.play")}{/}`
+          : `{gray-fg}■  ${t("ui.state.stop")}{/}`;
 
     // Big LCD counter (3 rows) on the left + info on the right.
     const [t1, t2, t3] = bigTime(fmtTime(s.position));

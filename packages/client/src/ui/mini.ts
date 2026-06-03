@@ -31,6 +31,7 @@ export class MiniUI {
   private currentIndex = -1;
   private playErrors = 0; // consecutive failed tracks (anti-loop guard)
   private errorMsg: string | null = null; // transient "can't play" banner
+  private loading = false; // true between selecting a track and audio starting
 
   constructor(
     private player: Player,
@@ -65,6 +66,7 @@ export class MiniUI {
         this.next();
       } else if (reason === "error") {
         const failed = this.tracks[this.currentIndex];
+        this.loading = false;
         this.playErrors++;
         if (this.playErrors < Math.max(1, this.tracks.length)) {
           this.errorMsg = t("ui.cantPlay", { title: failed?.title ?? "?" });
@@ -81,6 +83,7 @@ export class MiniUI {
     const track = this.tracks[i];
     if (!track) return;
     this.currentIndex = i;
+    this.loading = true;
     this.player.load(track.url);
     this.render();
   }
@@ -130,8 +133,11 @@ export class MiniUI {
 
   private render() {
     const s = this.player.state;
-    // A track started playing → clear any transient error message.
-    if (this.errorMsg && s.position > 0) this.errorMsg = null;
+    // Audio started → clear loading flag and any transient error message.
+    if (s.position > 0) {
+      this.loading = false;
+      if (this.errorMsg) this.errorMsg = null;
+    }
 
     const total = (this.bar.width as number) - 2;
     if (this.errorMsg) {
@@ -147,7 +153,9 @@ export class MiniUI {
     // Width available for the title = total - (icons + time + spec + margins)
     const fixed = 2 /*icon*/ + 1 + time.length + 2 + SPEC_COLS + 4;
     const titleW = Math.max(8, total - fixed);
-    const title = this.marquee(s.title ?? t("ui.noSong"), titleW);
+    const title = this.loading
+      ? t("ui.loading")
+      : this.marquee(s.title ?? t("ui.noSong"), titleW);
 
     this.bar.setContent(
       ` {green-fg}${icon}{/} {bold}${title}{/}  {green-fg}${time}{/}  ${spec} `,
