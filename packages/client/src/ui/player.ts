@@ -24,6 +24,7 @@ import {
   activePlaylist,
   setActivePlaylist,
   createPlaylist,
+  removePlaylist,
   type SearchResult,
 } from "../playlist.ts";
 import { ensureYtDlp } from "../ytdlp.ts";
@@ -508,6 +509,42 @@ export class PlayerUI {
     });
   }
 
+  /** Asks for confirmation, then deletes the selected playlist (file). */
+  private deletePlaylistSelected() {
+    const names = listPlaylists();
+    const i = (this.sidebar as unknown as { selected: number }).selected;
+    const name = names[i];
+    if (!name) return;
+
+    const q = blessed.question({
+      parent: this.screen,
+      top: "center",
+      left: "center",
+      width: "60%",
+      height: "shrink",
+      tags: true,
+      border: { type: "line" },
+      label: t("ui.deleteLabel"),
+      style: { border: { fg: "red" }, fg: "green", bg: "black" },
+    });
+    this.modal = true;
+    q.ask(t("ui.deletePlaylistConfirm", { name }), (_err, ok) => {
+      if (ok) {
+        removePlaylist(name);
+        const remaining = listPlaylists(); // recreates Default if none are left
+        if (activePlaylist() === name) {
+          this.switchToPlaylist(remaining[0] ?? "Default");
+        } else {
+          this.refreshSidebar();
+        }
+      }
+      setTimeout(() => {
+        this.modal = false;
+        this.focusPanel("sidebar");
+      }, 0);
+    });
+  }
+
   /** Closes the modal and refocuses the list on the next tick. */
   private endModal() {
     setTimeout(() => {
@@ -954,7 +991,14 @@ export class PlayerUI {
     );
     this.screen.key(["a"], g(() => this.promptAddUrl()));
     this.screen.key(["/"], g(() => this.promptSearch()));
-    this.screen.key(["d"], g(() => this.deleteSelected()));
+    this.screen.key(
+      ["d"],
+      g(() =>
+        this.focused === "sidebar"
+          ? this.deletePlaylistSelected()
+          : this.deleteSelected(),
+      ),
+    );
     this.screen.key(["l"], g(() => this.promptLanguage()));
     this.screen.key(["o"], g(() => this.openSettings()));
     this.screen.key(["?"], g(() => this.showHelp()));

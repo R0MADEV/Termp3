@@ -11,6 +11,7 @@ import {
   existsSync,
   appendFileSync,
   readdirSync,
+  rmSync,
 } from "node:fs";
 import { basename, join } from "node:path";
 import {
@@ -166,6 +167,12 @@ function uniquePlaylistName(name: string): string {
   let n = 2;
   while (existsSync(playlistFile(`${base} ${n}`))) n++;
   return `${base} ${n}`;
+}
+
+/** Deletes a named playlist file. */
+export function removePlaylist(name: string): void {
+  const file = playlistFile(name);
+  if (existsSync(file)) rmSync(file);
 }
 
 /** Creates a new named playlist with the given URLs. Returns the name used. */
