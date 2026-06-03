@@ -48,6 +48,20 @@ termp3 vol +5     # volumen
 Además, el **título del terminal** muestra el tema actual en cualquier terminal
 (Warp lo enseña en la barra de pestañas). Guía: **[docs/now-playing.md](docs/now-playing.md)**
 
+### Temas 🎨
+
+Temas integrados (Green por defecto): elígelos en **Ajustes (`o`) → Tema**.
+Crea el tuyo editando `~/.config/termp3/themes.json`:
+
+```json
+{
+  "Ocean": { "accent": "cyan", "spectrum": ["blue", "cyan", "white"] }
+}
+```
+
+`accent` es el color principal; `spectrum` son los colores grave/medio/agudo del
+visualizador (nombres de color del terminal: green, yellow, red, cyan, blue…).
+
 ---
 
 ## 🛠️ Para desarrolladores — clona y corre

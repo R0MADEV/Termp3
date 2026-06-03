@@ -48,6 +48,20 @@ termp3 vol +5     # volume
 Also, the **terminal title** shows the current track in any terminal
 (Warp shows it in the tab bar). Guide: **[docs/now-playing.md](docs/now-playing.md)**
 
+### Themes 🎨
+
+Built-in themes (Green by default): pick one in **Settings (`o`) → Theme**.
+Create your own by editing `~/.config/termp3/themes.json`:
+
+```json
+{
+  "Ocean": { "accent": "cyan", "spectrum": ["blue", "cyan", "white"] }
+}
+```
+
+`accent` is the main color; `spectrum` is the visualizer's low/mid/high colors
+(terminal color names: green, yellow, red, cyan, blue, magenta, white…).
+
 ---
 
 ## 🛠️ For developers — clone and run
