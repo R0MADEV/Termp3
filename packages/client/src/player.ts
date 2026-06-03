@@ -45,10 +45,10 @@ export class Player extends EventEmitter {
 
   constructor(
     private mpvBin = "mpv",
-    initialVolume = 80,
+    initialVolume = 100,
   ) {
     super();
-    this.state.volume = Math.max(0, Math.min(150, initialVolume));
+    this.state.volume = Math.max(0, Math.min(100, initialVolume));
     // Control socket: named pipe on Windows, unix socket everywhere else.
     this.socketPath =
       process.platform === "win32"
@@ -192,7 +192,7 @@ export class Player extends EventEmitter {
   }
 
   setVolume(volume: number) {
-    const v = Math.max(0, Math.min(150, volume));
+    const v = Math.max(0, Math.min(100, volume));
     this.state.volume = v;
     this.send({ command: ["set_property", "volume", v] });
   }

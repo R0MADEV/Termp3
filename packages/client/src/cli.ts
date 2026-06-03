@@ -60,7 +60,7 @@ async function launchUI() {
 
   await ensureYtDlpForTracks(tracks);
 
-  const player = new Player(mpv.path ?? "mpv", loadSettings().volume ?? 80);
+  const player = new Player(mpv.path ?? "mpv", loadSettings().volume ?? 100);
   await player.start();
 
   const ui = new PlayerUI(player, tracks);
@@ -95,7 +95,7 @@ async function launchMini(position: "top" | "bottom") {
 
   await ensureYtDlpForTracks(tracks);
 
-  const player = new Player(mpv.path ?? "mpv", loadSettings().volume ?? 80);
+  const player = new Player(mpv.path ?? "mpv", loadSettings().volume ?? 100);
   await player.start();
 
   const ui = new MiniUI(player, tracks, position);
@@ -161,7 +161,7 @@ async function play(url: string) {
     }
   }
 
-  const player = new Player(mpv.path ?? "mpv", loadSettings().volume ?? 80);
+  const player = new Player(mpv.path ?? "mpv", loadSettings().volume ?? 100);
   await player.start();
   player.load(url);
 
