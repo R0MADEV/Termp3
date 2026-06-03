@@ -54,6 +54,10 @@ export interface Settings {
   searchLimit?: number;
   volume?: number;
   activePlaylist?: string;
+  // Resume: last track + position within the last playlist.
+  lastPlaylist?: string;
+  lastUrl?: string;
+  lastPos?: number;
 }
 
 /** Reads persisted user settings (empty object if none). */

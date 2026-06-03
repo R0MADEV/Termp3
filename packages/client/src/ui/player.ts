@@ -94,6 +94,7 @@ export class PlayerUI {
   private repeat: "off" | "all" | "one" = "all";
   private loading = false; // true between selecting a track and audio starting
   private mutedVol: number | null = null; // pre-mute volume while muted
+  private pendingSeek: number | null = null; // resume position to apply once playing
 
   constructor(
     private player: Player,
@@ -176,7 +177,15 @@ export class PlayerUI {
 
     // Visual refresh (marquee + visualizer + timers).
     setInterval(() => this.tick(), 120);
-    this.player.on("state", () => this.renderMain());
+    this.player.on("state", () => {
+      // Apply the resume position once the track actually starts.
+      if (this.pendingSeek !== null && this.player.state.position > 0) {
+        const target = this.pendingSeek;
+        this.pendingSeek = null;
+        if (target > 0) this.player.seekTo(target);
+      }
+      this.renderMain();
+    });
     // Auto-advance on natural end ("eof"); skip on "error" with a loop guard.
     this.player.on("ended", (reason: string) => {
       if (reason === "eof") {
@@ -1012,13 +1021,37 @@ export class PlayerUI {
     this.screen.key(["-"], g(() => this.changeVolume(-5)));
     this.screen.key(["m"], g(() => this.toggleMute()));
     this.screen.key(["q", "C-c"], () => {
+      this.saveResume();
       this.player.quit();
       this.screen.destroy();
       process.exit(0);
     });
   }
 
+  /** Persists the current track + position so the next launch can resume. */
+  private saveResume() {
+    const track = this.tracks[this.currentIndex];
+    if (!track) return;
+    saveSettings({
+      lastPlaylist: activePlaylist(),
+      lastUrl: track.url,
+      lastPos: Math.floor(this.player.state.position),
+    });
+  }
+
+  /** Resumes the last track + position if it's still in the active playlist. */
+  private resumeIfPossible() {
+    const s = loadSettings();
+    if (s.lastPlaylist !== activePlaylist()) return;
+    if (!s.lastUrl) return;
+    const idx = this.tracks.findIndex((t) => t.url === s.lastUrl);
+    if (idx < 0) return;
+    this.pendingSeek = s.lastPos ?? 0;
+    this.playIndex(idx);
+  }
+
   start() {
+    this.resumeIfPossible();
     this.renderMain();
     this.screen.render();
   }
