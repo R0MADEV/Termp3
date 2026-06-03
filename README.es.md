@@ -10,6 +10,7 @@ y **rotación de DJ por turnos** — escuchad juntos, desde la terminal.
 - 🎧 **Modo solo:** reproduce YouTube, radios, streams o archivos locales. Funciona sin servidor, incluso offline (archivos locales).
 - 👥 **Modo sala (opcional):** entra a una sala con un código y escuchad lo mismo, sincronizado. Cada persona pincha **por turnos** (rotación en bucle).
 - 🚫 **Sin descargar nada:** streaming puro. Sin Spotify Premium.
+- 📊 **Visualizador reactivo real:** FFT en vivo (ffmpeg auto-instalado) con varios modos — barras, espejo, suave, osciloscopio, plasma (cambia con `v`).
 - 🖥️ **Multiplataforma:** macOS, Linux y Windows.
 
 > El núcleo es agnóstico de la fuente: YouTube es solo una opción más.
@@ -111,8 +112,13 @@ termp3/
 
 ## Aviso legal
 
-termp3 es un reproductor genérico. Respeta los términos de servicio de las
-plataformas que reproduzcas; el uso es responsabilidad de cada usuario.
+termp3 **no** almacena ni convierte música — solo reproduce streams.
+Úsalo únicamente con contenido que tengas derecho a reproducir y respetando
+los términos de cada plataforma. El uso es responsabilidad de cada usuario.
+
+Usa mpv y yt-dlp para leer el contenido; respeta el copyright y los términos de
+cada sitio (como advierte el propio yt-dlp). Este proyecto no está diseñado para
+descargar música ni para saltarse ninguna protección.
 
 ## Licencia
 

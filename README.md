@@ -10,6 +10,7 @@ A **retro** terminal music player with **synced rooms** and
 - 🎧 **Solo mode:** play YouTube, radios, streams or local files. Works without a server, even offline (local files).
 - 👥 **Room mode (optional):** join a room with a code and listen together, in sync. Everyone takes **turns** as DJ (round-robin).
 - 🚫 **No downloads:** pure streaming. No Spotify Premium needed.
+- 📊 **Real audio-reactive visualizer:** live FFT (auto-installed ffmpeg) with several modes — bars, mirror, smooth, oscilloscope, plasma (cycle with `v`).
 - 🖥️ **Cross-platform:** macOS, Linux and Windows.
 
 > The core is source-agnostic: YouTube is just one option.
@@ -111,8 +112,13 @@ termp3/
 
 ## Disclaimer
 
-termp3 is a generic player. Respect the terms of service of the platforms you
-play; usage is each user's responsibility.
+termp3 does **not** download, store or convert music — it only plays streams.
+Use it only with content you have the right to play, and respect each
+platform's terms of service. How you use it is your responsibility.
+
+It relies on mpv and yt-dlp to read media; respect copyright and the terms of
+each site (as yt-dlp itself advises). This project is not designed to download
+music or to circumvent any protection.
 
 ## License
 
