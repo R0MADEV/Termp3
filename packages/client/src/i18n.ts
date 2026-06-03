@@ -79,7 +79,7 @@ CONTROLS (interface):
     "ui.noSong": "— no song —",
     "ui.loading": "⏳ Loading…",
     "ui.importing": "⏳ Importing playlist…",
-    "ui.imported": "Added {n} tracks",
+    "ui.importedTo": "Imported {n} tracks → {name}",
     "ui.emptyHint": "Press / to search or a to add a track",
     "ui.resolving": "resolving",
     "ui.cantPlay": "⚠ Can't play: {title} — skipping",
@@ -121,8 +121,10 @@ CONTROLS (interface):
     "ui.settingsLabel": " Settings ",
     "ui.optLanguage": "Language",
     "ui.optSearch": "Search results",
+    "ui.optPlaylist": "Playlist",
     "ui.searchLimitLabel": " Search results ",
     "ui.resultsCount": "{n} results",
+    "ui.playlistsLabel": " Playlists ",
   },
   es: {
     "help.body": `
@@ -185,7 +187,7 @@ CONTROLES (interfaz):
     "ui.noSong": "— sin cancion —",
     "ui.loading": "⏳ Cargando…",
     "ui.importing": "⏳ Importando playlist…",
-    "ui.imported": "Anadidas {n} canciones",
+    "ui.importedTo": "Importadas {n} canciones → {name}",
     "ui.emptyHint": "Pulsa / para buscar o a para anadir",
     "ui.resolving": "resolviendo",
     "ui.cantPlay": "⚠ No se puede reproducir: {title} — saltando",
@@ -227,8 +229,10 @@ CONTROLES (interfaz):
     "ui.settingsLabel": " Ajustes ",
     "ui.optLanguage": "Idioma",
     "ui.optSearch": "Resultados de busqueda",
+    "ui.optPlaylist": "Lista",
     "ui.searchLimitLabel": " Resultados de busqueda ",
     "ui.resultsCount": "{n} resultados",
+    "ui.playlistsLabel": " Listas ",
   },
 };
 

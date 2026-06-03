@@ -18,7 +18,12 @@ import {
   resolveTitles,
   searchYouTube,
   isPlaylistUrl,
-  fetchPlaylistEntries,
+  fetchPlaylist,
+  loadPlaylist,
+  listPlaylists,
+  activePlaylist,
+  setActivePlaylist,
+  createPlaylist,
   type SearchResult,
 } from "../playlist.ts";
 import { ensureYtDlp } from "../ytdlp.ts";
@@ -593,16 +598,25 @@ export class PlayerUI {
           });
           this.screen.render();
           await ensureYtDlp(() => {});
-          const entries = await fetchPlaylistEntries(url);
+          const { name, entries } = await fetchPlaylist(url);
           loading.destroy();
-          for (const e of entries) {
-            if (addUrl(e.url).added) {
-              this.tracks.push({ url: e.url, title: e.title, resolved: true });
-            }
-          }
+          if (entries.length === 0) return this.flashThenEnd(t("ui.noResults"));
+          // Save as its own playlist and switch to it (don't touch the current).
+          const created = createPlaylist(
+            name,
+            entries.map((e) => e.url),
+          );
+          setActivePlaylist(created);
+          this.currentIndex = -1;
+          this.tracks = entries.map((e) => ({
+            url: e.url,
+            title: e.title,
+            resolved: true,
+          }));
           this.refreshList();
-          if (entries.length > 0) return this.flashThenEnd(
-            t("ui.imported", { n: entries.length }),
+          this.playIndex(0, true);
+          return this.flashThenEnd(
+            t("ui.importedTo", { n: entries.length, name: created }),
           );
         } else if (url) {
           const res = addUrl(url);
@@ -660,21 +674,32 @@ export class PlayerUI {
   /** Settings menu: routes to the language or search-results pickers. */
   private openSettings() {
     const cur = loadSettings();
+    const options = [
+      {
+        label: `${t("ui.optLanguage")}:  ${LOCALE_NAMES[getLocale()]}`,
+        action: () => this.promptLanguage(),
+      },
+      {
+        label: `${t("ui.optSearch")}:  ${cur.searchLimit ?? 20}`,
+        action: () => this.promptSearchLimit(),
+      },
+      {
+        label: `${t("ui.optPlaylist")}:  ${activePlaylist()}`,
+        action: () => this.promptPlaylists(),
+      },
+    ];
     const menu = blessed.list({
       parent: this.screen,
       top: "center",
       left: "center",
-      width: 40,
-      height: 4,
+      width: 44,
+      height: options.length + 2,
       tags: true,
       keys: true,
       vi: true,
       border: { type: "line" },
       label: t("ui.settingsLabel"),
-      items: [
-        `${t("ui.optLanguage")}:  ${LOCALE_NAMES[getLocale()]}`,
-        `${t("ui.optSearch")}:  ${cur.searchLimit ?? 20}`,
-      ],
+      items: options.map((o) => o.label),
       style: {
         border: { fg: "green" },
         fg: "green",
@@ -685,14 +710,59 @@ export class PlayerUI {
     this.modal = true;
     menu.on("select", (_item, index) => {
       menu.destroy();
-      if (index === 0) this.promptLanguage();
-      else this.promptSearchLimit();
+      options[index]?.action();
     });
     menu.key(["escape"], () => {
       menu.destroy();
       this.endModal();
     });
     menu.focus();
+    this.screen.render();
+  }
+
+  /** Picker to switch the active playlist; reloads its tracks. */
+  private promptPlaylists() {
+    const names = listPlaylists();
+    const picker = blessed.list({
+      parent: this.screen,
+      top: "center",
+      left: "center",
+      width: 40,
+      height: Math.min(names.length + 2, 14),
+      tags: true,
+      keys: true,
+      vi: true,
+      scrollable: true,
+      border: { type: "line" },
+      label: t("ui.playlistsLabel"),
+      items: names,
+      style: {
+        border: { fg: "green" },
+        fg: "green",
+        bg: "black",
+        selected: { bg: "green", fg: "black" },
+      },
+    });
+    const cur = names.indexOf(activePlaylist());
+    if (cur >= 0) picker.select(cur);
+    picker.on("select", (_item, index) => {
+      const name = names[index];
+      picker.destroy();
+      if (!name) return this.endModal();
+      setActivePlaylist(name);
+      this.currentIndex = -1;
+      this.tracks = loadPlaylist();
+      this.refreshList();
+      resolveTitles(this.tracks, (i, tr) => this.updateTrack(i, tr)).catch(
+        () => {},
+      );
+      this.endModal();
+    });
+    picker.key(["escape"], () => {
+      picker.destroy();
+      this.endModal();
+    });
+    picker.focus();
     this.screen.render();
   }
 

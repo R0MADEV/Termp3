@@ -9,7 +9,7 @@
 import { checkMpv, checkYtDlp, installHint } from "./deps.ts";
 import { Player } from "./player.ts";
 import { loadPlaylist, resolveTitles, addUrl } from "./playlist.ts";
-import { PLAYLIST_FILE, loadSettings, saveSettings } from "./config.ts";
+import { PLAYLISTS_DIR, loadSettings, saveSettings } from "./config.ts";
 import { PlayerUI } from "./ui/player.ts";
 import { MiniUI } from "./ui/mini.ts";
 import { startTitleBroadcast } from "./title.ts";
@@ -45,7 +45,7 @@ const VERSION = "0.0.1";
 }
 
 function help() {
-  console.log(t("help.body", { version: VERSION, playlist: PLAYLIST_FILE }));
+  console.log(t("help.body", { version: VERSION, playlist: PLAYLISTS_DIR }));
 }
 
 async function launchUI() {
@@ -89,7 +89,7 @@ async function launchMini(position: "top" | "bottom") {
   }
   const tracks = loadPlaylist();
   if (tracks.length === 0) {
-    console.log(t("playlist.empty", { file: PLAYLIST_FILE }));
+    console.log(t("playlist.empty", { file: PLAYLISTS_DIR }));
     process.exit(0);
   }
 

@@ -2,10 +2,20 @@
 
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { mkdirSync, existsSync, writeFileSync, readFileSync } from "node:fs";
+import {
+  mkdirSync,
+  existsSync,
+  writeFileSync,
+  readFileSync,
+  copyFileSync,
+} from "node:fs";
 
 export const CONFIG_DIR = join(homedir(), ".config", "termp3");
+// Legacy single playlist (migrated into playlists/Default.txt on first run).
 export const PLAYLIST_FILE = join(CONFIG_DIR, "playlist.txt");
+// One file per named playlist lives here.
+export const PLAYLISTS_DIR = join(CONFIG_DIR, "playlists");
+export const DEFAULT_PLAYLIST_NAME = "Default";
 export const TITLES_CACHE = join(CONFIG_DIR, "titles.json");
 // User settings (language, etc.).
 export const SETTINGS_FILE = join(CONFIG_DIR, "settings.json");
@@ -24,16 +34,26 @@ const DEFAULT_PLAYLIST = `# termp3 — playlist
 https://www.youtube.com/watch?v=dQw4w9WgXcQ
 `;
 
-/** Creates the config directory and a sample playlist if it doesn't exist. */
+/**
+ * Creates the config + playlists directories and ensures a "Default" playlist
+ * exists, migrating the legacy playlist.txt the first time.
+ */
 export function ensureConfig(): void {
   if (!existsSync(CONFIG_DIR)) mkdirSync(CONFIG_DIR, { recursive: true });
-  if (!existsSync(PLAYLIST_FILE)) writeFileSync(PLAYLIST_FILE, DEFAULT_PLAYLIST);
+  if (!existsSync(PLAYLISTS_DIR)) mkdirSync(PLAYLISTS_DIR, { recursive: true });
+
+  const defaultFile = join(PLAYLISTS_DIR, `${DEFAULT_PLAYLIST_NAME}.txt`);
+  if (!existsSync(defaultFile)) {
+    if (existsSync(PLAYLIST_FILE)) copyFileSync(PLAYLIST_FILE, defaultFile);
+    else writeFileSync(defaultFile, DEFAULT_PLAYLIST);
+  }
 }
 
 export interface Settings {
   lang?: string;
   searchLimit?: number;
   volume?: number;
+  activePlaylist?: string;
 }
 
 /** Reads persisted user settings (empty object if none). */
