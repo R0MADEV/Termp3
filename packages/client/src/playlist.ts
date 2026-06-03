@@ -77,9 +77,16 @@ export async function searchYouTube(
   return parseEntries(out);
 }
 
-/** True if a URL points to a YouTube playlist/album. */
+/**
+ * True if a URL points to a real, importable playlist/album.
+ * Radio/mix lists (list=RD…, &start_radio=1) are auto-generated infinite
+ * mixes, not fixed playlists — treat those as a single track.
+ */
 export function isPlaylistUrl(url: string): boolean {
-  return /[?&]list=/.test(url) || /\/playlist\?/.test(url);
+  if (/[?&]start_radio=1/.test(url)) return false;
+  const m = url.match(/[?&]list=([^&]+)/);
+  if (m) return !(m[1] ?? "").startsWith("RD");
+  return /\/playlist\?/.test(url);
 }
 
 /** Expands a YouTube playlist URL into its name and entries. */

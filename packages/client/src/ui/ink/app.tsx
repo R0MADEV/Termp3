@@ -60,6 +60,12 @@ function bar(ratio: number, width: number): string {
   return "▰".repeat(filled) + "▱".repeat(width - filled);
 }
 
+/** Strips playlist/radio params so only the single video is added. */
+function singleVideoUrl(url: string): string {
+  const m = url.match(/[?&]v=([^&]+)/);
+  return m ? `https://www.youtube.com/watch?v=${m[1]}` : url;
+}
+
 function useTermSize() {
   const { stdout } = useStdout();
   const [size, setSize] = useState({
@@ -279,6 +285,7 @@ function Panel({
   items,
   selected,
   focused,
+  maxVisible,
   width,
   flexGrow,
 }: {
@@ -286,10 +293,17 @@ function Panel({
   items: React.ReactNode[];
   selected: number;
   focused: boolean;
+  maxVisible: number;
   width?: number;
   flexGrow?: number;
 }) {
   const accent = theme().accent;
+  const max = maxVisible < items.length ? maxVisible : items.length;
+  const start =
+    max < items.length
+      ? Math.max(0, Math.min(selected - Math.floor(max / 2), items.length - max))
+      : 0;
+  const visible = items.slice(start, start + max);
   return (
     <Box
       borderStyle="round"
@@ -302,12 +316,17 @@ function Panel({
       <Text bold color={focused ? accent : "gray"}>
         {title}
       </Text>
-      {items.map((node, i) => (
-        <Box key={i}>
-          <Text color={accent}>{i === selected && focused ? "› " : "  "}</Text>
-          {node}
-        </Box>
-      ))}
+      {start > 0 && <Text dimColor> ▲ …</Text>}
+      {visible.map((node, i) => {
+        const idx = start + i;
+        return (
+          <Box key={idx}>
+            <Text color={accent}>{idx === selected && focused ? "› " : "  "}</Text>
+            {node}
+          </Box>
+        );
+      })}
+      {start + max < items.length && <Text dimColor> ▼ …</Text>}
     </Box>
   );
 }
@@ -398,7 +417,7 @@ type Overlay =
   | { kind: "searchLimit" }
   | { kind: "help" }
   | { kind: "searchInput" }
-  | { kind: "addInput" }
+  | { kind: "addInput"; target: "track" | "list" }
   | { kind: "searchResults"; results: SearchResult[] }
   | { kind: "confirmTrack"; index: number }
   | { kind: "confirmPlaylist"; name: string }
@@ -610,21 +629,29 @@ function App({
     setSel(0);
     setOverlay({ kind: "searchResults", results });
   };
-  const doAdd = async (url: string) => {
+  // Lists panel: import a playlist (or make a 1-track list) as a NEW list.
+  const importList = async (url: string) => {
+    setOverlay({ kind: "loading", text: t("ui.importing") });
+    await ensureYtDlp(() => {});
     if (isPlaylistUrl(url)) {
-      setOverlay({ kind: "loading", text: t("ui.importing") });
-      await ensureYtDlp(() => {});
       const { name, entries } = await fetchPlaylist(url);
       if (entries.length === 0) return setOverlay({ kind: "none" });
       const created = createPlaylist(name, entries.map((e) => e.url));
-      setActivePlaylist(created);
       setPlaylists(listPlaylists());
       setSideIdx(Math.max(0, listPlaylists().indexOf(created)));
-      reload();
-      setOverlay({ kind: "none" });
-      return;
+      switchPlaylist(created);
+    } else {
+      const created = createPlaylist("New playlist", [singleVideoUrl(url)]);
+      setPlaylists(listPlaylists());
+      setSideIdx(Math.max(0, listPlaylists().indexOf(created)));
+      switchPlaylist(created);
     }
-    addUrl(url);
+    setOverlay({ kind: "none" });
+  };
+
+  // Tracks panel: add a single track to the active playlist (never a playlist).
+  const addTrack = (url: string) => {
+    addUrl(singleVideoUrl(url));
     reload();
     setOverlay({ kind: "none" });
   };
@@ -645,10 +672,12 @@ function App({
       if (key.escape) return closeOverlay();
       if (key.return) {
         const value = input.trim();
+        const ov = overlay;
         closeOverlay();
         if (!value) return;
-        if (overlay.kind === "searchInput") void doSearch(value);
-        else void doAdd(value);
+        if (ov.kind === "searchInput") void doSearch(value);
+        else if (ov.target === "list") void importList(value);
+        else addTrack(value);
         return;
       }
       if (key.backspace || key.delete) return setInput((s) => s.slice(0, -1));
@@ -716,7 +745,11 @@ function App({
     if (ch === "+" || ch === "=") return setVol(player.state.volume + 5);
     if (ch === "-") return setVol(player.state.volume - 5);
     if (ch === "/") return openOverlay({ kind: "searchInput" });
-    if (ch === "a") return openOverlay({ kind: "addInput" });
+    if (ch === "a")
+      return openOverlay({
+        kind: "addInput",
+        target: focus === "sidebar" ? "list" : "track",
+      });
     if (ch === "o") return openOverlay({ kind: "settings" });
     if (ch === "?") return openOverlay({ kind: "help" });
     if (ch === "d") {
@@ -826,6 +859,8 @@ function App({
   }
 
   const loading = !!state.url && state.position === 0 && !state.paused;
+  // Rows available for list items (NowPlaying ~13 + status + borders/title).
+  const panelMax = Math.max(3, rows - 18);
 
   const sideItems = playlists.map((name) => (
     <Text key={name} color={accent} bold={name === activePlaylist()}>
@@ -859,6 +894,7 @@ function App({
           items={sideItems}
           selected={sideIdx}
           focused={focus === "sidebar"}
+          maxVisible={panelMax}
           width={SIDEBAR_W}
         />
         <Panel
@@ -870,6 +906,7 @@ function App({
           }
           selected={listIdx}
           focused={focus === "tracks"}
+          maxVisible={panelMax}
           flexGrow={1}
         />
       </Box>
@@ -954,8 +991,19 @@ function renderOverlay(
     );
   }
   if (overlay.kind === "searchInput" || overlay.kind === "addInput") {
-    const prompt = overlay.kind === "searchInput" ? t("ui.searchPrompt") : t("ui.addPrompt");
-    const title = overlay.kind === "searchInput" ? t("ui.searchLabel") : t("ui.addLabel");
+    const isList = overlay.kind === "addInput" && overlay.target === "list";
+    const prompt =
+      overlay.kind === "searchInput"
+        ? t("ui.searchPrompt")
+        : isList
+          ? t("ui.importPrompt")
+          : t("ui.addPrompt");
+    const title =
+      overlay.kind === "searchInput"
+        ? t("ui.searchLabel")
+        : isList
+          ? t("ui.importLabel")
+          : t("ui.addLabel");
     return (
       <Modal title={title.trim()} cols={cols} rows={rows} width={wide}>
         <Text>{prompt}</Text>
