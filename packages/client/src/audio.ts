@@ -106,52 +106,46 @@ function analyzeFrame(buf: Buffer, peak: { v: number }): number[] {
 }
 
 export class AudioAnalyzer extends EventEmitter {
-  private proc: ChildProcess | null = null;
+  private procs: ChildProcess[] = [];
   private buf: Buffer = Buffer.alloc(0);
   private peak = { v: 0 };
   private gen = 0;
 
-  /** Resolves a playable input for ffmpeg (direct URL for remote sources). */
-  private resolveInput(url: string): Promise<string | null> {
-    if (!/^https?:\/\//i.test(url)) return Promise.resolve(url);
-    return new Promise((resolve) => {
-      const p = spawn(ytDlpCommand(), ["-f", "bestaudio", "-g", "--no-playlist", url]);
-      let out = "";
-      p.stdout?.on("data", (d) => (out += d.toString()));
-      p.on("error", () => resolve(null));
-      p.on("close", (c) =>
-        resolve(c === 0 ? (out.split(/\r?\n/)[0]?.trim() ?? null) : null),
-      );
-    });
-  }
-
-  /** Starts analyzing a track from a given position (seconds). */
-  async start(url: string, fromSec = 0): Promise<void> {
+  /**
+   * Starts analyzing a track. For remote URLs we pipe yt-dlp → ffmpeg so
+   * yt-dlp handles YouTube's ranged/DASH delivery and feeds the FULL stream
+   * (a raw direct URL would cut off after the first chunk). For local files
+   * ffmpeg reads directly (and can fast-seek with -ss).
+   */
+  start(url: string, fromSec = 0): void {
     this.stop();
     const myGen = ++this.gen;
-    const input = await this.resolveInput(url);
-    if (myGen !== this.gen || !input || !ffmpegPath) return;
+    if (!ffmpegPath || myGen !== this.gen) return;
+
+    const remote = /^https?:\/\//i.test(url);
+    const args = ["-hide_banner", "-loglevel", "quiet", "-re"];
+    let yt: ChildProcess | null = null;
+
+    if (remote) {
+      yt = spawn(
+        ytDlpCommand(),
+        ["-f", "bestaudio/best", "-o", "-", "--no-playlist", url],
+        { stdio: ["ignore", "pipe", "ignore"] },
+      );
+      yt.on("error", () => {});
+      args.push("-i", "pipe:0");
+    } else {
+      if (fromSec > 0) args.push("-ss", String(Math.floor(fromSec)));
+      args.push("-i", url);
+    }
+    args.push("-f", "s16le", "-ac", "1", "-ar", String(SAMPLE_RATE), "-");
+
+    const ff = spawn(ffmpegPath, args, { stdio: ["pipe", "pipe", "ignore"] });
+    ff.on("error", () => {});
+    if (yt?.stdout && ff.stdin) yt.stdout.pipe(ff.stdin);
 
     const bytesPerFrame = FFT_SIZE * 2;
-    this.proc = spawn(ffmpegPath, [
-      "-hide_banner",
-      "-loglevel",
-      "quiet",
-      "-re",
-      "-ss",
-      String(Math.max(0, Math.floor(fromSec))),
-      "-i",
-      input,
-      "-f",
-      "s16le",
-      "-ac",
-      "1",
-      "-ar",
-      String(SAMPLE_RATE),
-      "-",
-    ]);
-    this.proc.on("error", () => {});
-    this.proc.stdout?.on("data", (chunk: Buffer) => {
+    ff.stdout?.on("data", (chunk: Buffer) => {
       this.buf = this.buf.length ? Buffer.concat([this.buf, chunk]) : chunk;
       while (this.buf.length >= bytesPerFrame) {
         const frame = this.buf.subarray(0, bytesPerFrame);
@@ -160,12 +154,40 @@ export class AudioAnalyzer extends EventEmitter {
         this.emit("wave", waveFrom(frame));
       }
     });
+    this.procs = yt ? [yt, ff] : [ff];
+  }
+
+  /** Freezes the analysis (kept in sync with the player on pause). */
+  pause(): void {
+    for (const p of this.procs) {
+      try {
+        p.kill("SIGSTOP");
+      } catch {
+        // ignore (e.g. Windows)
+      }
+    }
+  }
+
+  resume(): void {
+    for (const p of this.procs) {
+      try {
+        p.kill("SIGCONT");
+      } catch {
+        // ignore
+      }
+    }
   }
 
   stop(): void {
     this.gen++; // invalidate any in-flight start()
-    this.proc?.kill();
-    this.proc = null;
+    for (const p of this.procs) {
+      try {
+        p.kill("SIGKILL");
+      } catch {
+        // ignore
+      }
+    }
+    this.procs = [];
     this.buf = Buffer.alloc(0);
   }
 }

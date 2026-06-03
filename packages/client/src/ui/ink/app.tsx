@@ -468,7 +468,7 @@ function App({
     setCurrent(i);
     setListIdx(i);
     player.load(tr.url);
-    void analyzer.start(tr.url, 0);
+    analyzer.start(tr.url, 0);
   };
   const pickNext = (auto: boolean): number | null => {
     const n = tracks.length;
@@ -513,9 +513,8 @@ function App({
       const paused = player.state.paused;
       if (paused !== prevPaused.current) {
         prevPaused.current = paused;
-        const tr = tracks[current];
-        if (tr && paused) analyzer.stop();
-        else if (tr) void analyzer.start(tr.url, player.state.position);
+        if (paused) analyzer.pause();
+        else analyzer.resume();
       }
       setState({ ...player.state });
     };
@@ -599,7 +598,7 @@ function App({
         setCurrent(idx);
         setListIdx(idx);
         player.load(initialTracks[idx]!.url);
-        void analyzer.start(initialTracks[idx]!.url, s.lastPos ?? 0);
+        analyzer.start(initialTracks[idx]!.url, s.lastPos ?? 0);
         if (s.lastPos) setTimeout(() => player.seekTo(s.lastPos!), 1500);
       }
     }
