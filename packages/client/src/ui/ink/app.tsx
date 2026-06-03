@@ -2,7 +2,7 @@
 // theme, i18n, ytdlp) is reused unchanged; this is only the presentation +
 // input layer.
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { EventEmitter } from "node:events";
 import { render, Box, Text, useApp, useInput, useStdout } from "ink";
 import type { Player } from "../../player.ts";
@@ -38,10 +38,11 @@ import {
 } from "../../i18n.ts";
 import { loadSettings, saveSettings } from "../../config.ts";
 import { ensureYtDlp } from "../../ytdlp.ts";
+import { AudioAnalyzer, BANDS } from "../../audio.ts";
 
 const SIDEBAR_W = 24;
 const SPECTRUM_H = 6;
-const SPECTRUM_COLS = 36;
+const SPECTRUM_COLS = BANDS;
 const SEARCH_PRESETS = [10, 20, 30, 50, 100];
 
 /** Command bus so `termp3 pause/next/...` (another tab) can drive the UI. */
@@ -287,7 +288,15 @@ type Overlay =
   | { kind: "confirmPlaylist"; name: string }
   | { kind: "loading"; text: string };
 
-function App({ player, initialTracks }: { player: Player; initialTracks: Track[] }) {
+function App({
+  player,
+  initialTracks,
+  analyzer,
+}: {
+  player: Player;
+  initialTracks: Track[];
+  analyzer: AudioAnalyzer;
+}) {
   const { exit } = useApp();
   const { cols, rows } = useTermSize();
   const accent = theme().accent;
@@ -310,6 +319,7 @@ function App({ player, initialTracks }: { player: Player; initialTracks: Track[]
   const [sel, setSel] = useState(0); // selection index inside list overlays
   const [input, setInput] = useState(""); // text-input overlays
   const [, bump] = useState(0); // force re-render after theme/lang change
+  const prevPaused = useRef(false);
 
   // --- playback ---
   const play = (i: number) => {
@@ -318,6 +328,7 @@ function App({ player, initialTracks }: { player: Player; initialTracks: Track[]
     setCurrent(i);
     setListIdx(i);
     player.load(tr.url);
+    void analyzer.start(tr.url, 0);
   };
   const pickNext = (auto: boolean): number | null => {
     const n = tracks.length;
@@ -357,7 +368,17 @@ function App({ player, initialTracks }: { player: Player; initialTracks: Track[]
 
   // --- effects ---
   useEffect(() => {
-    const onState = () => setState({ ...player.state });
+    const onState = () => {
+      // Keep the analyzer in sync with pause/resume.
+      const paused = player.state.paused;
+      if (paused !== prevPaused.current) {
+        prevPaused.current = paused;
+        const tr = tracks[current];
+        if (tr && paused) analyzer.stop();
+        else if (tr) void analyzer.start(tr.url, player.state.position);
+      }
+      setState({ ...player.state });
+    };
     const onEnded = (r: string) => {
       if (r === "eof") advance(true);
       else if (r === "error") advance(false);
@@ -389,16 +410,20 @@ function App({ player, initialTracks }: { player: Player; initialTracks: Track[]
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [player, tracks, current, shuffle, repeat]);
 
+  // Real frequency bands from the audio analyzer.
+  useEffect(() => {
+    const onBands = (b: number[]) => setSpec(b.map((v) => v * SPECTRUM_H));
+    analyzer.on("bands", onBands);
+    return () => {
+      analyzer.off("bands", onBands);
+    };
+  }, [analyzer]);
+
+  // Decay the bars while paused/stopped.
   useEffect(() => {
     const id = setInterval(() => {
-      const playing = !!player.state.url && !player.state.paused;
-      setSpec((prev) =>
-        prev.map((v) => {
-          if (!playing) return Math.max(0, v - 1);
-          const target = Math.round(Math.random() * SPECTRUM_H);
-          return Math.max(0, Math.min(SPECTRUM_H, Math.round((v * 2 + target) / 3)));
-        }),
-      );
+      if (!!player.state.url && !player.state.paused) return;
+      setSpec((prev) => prev.map((v) => Math.max(0, v - 0.6)));
     }, 120);
     return () => clearInterval(id);
   }, [player]);
@@ -419,6 +444,7 @@ function App({ player, initialTracks }: { player: Player; initialTracks: Track[]
         setCurrent(idx);
         setListIdx(idx);
         player.load(initialTracks[idx]!.url);
+        void analyzer.start(initialTracks[idx]!.url, s.lastPos ?? 0);
         if (s.lastPos) setTimeout(() => player.seekTo(s.lastPos!), 1500);
       }
     }
@@ -434,6 +460,7 @@ function App({ player, initialTracks }: { player: Player; initialTracks: Track[]
         lastPos: Math.floor(player.state.position),
       });
     }
+    analyzer.stop();
     player.quit();
     exit();
   };
@@ -833,9 +860,11 @@ function renderOverlay(
 }
 
 /** Mounts the Ink UI (alternate screen, restored on exit). */
-export function runInkUI(player: Player, tracks: Track[]) {
+export function runInkUI(player: Player, tracks: Track[], analyzer: AudioAnalyzer) {
   process.stdout.write("\x1b[?1049h");
-  const app = render(<App player={player} initialTracks={tracks} />);
+  const app = render(
+    <App player={player} initialTracks={tracks} analyzer={analyzer} />,
+  );
   app.waitUntilExit().then(() => {
     process.stdout.write("\x1b[?1049l");
     process.exit(0);

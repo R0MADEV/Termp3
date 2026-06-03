@@ -11,6 +11,7 @@ import { Player } from "./player.ts";
 import { loadPlaylist, resolveTitles, addUrl } from "./playlist.ts";
 import { PLAYLISTS_DIR, loadSettings, saveSettings } from "./config.ts";
 import { runInkUI, controlBus } from "./ui/ink/app.tsx";
+import { AudioAnalyzer } from "./audio.ts";
 import { startTitleBroadcast } from "./title.ts";
 import { startStatusBroadcast, readStatus } from "./status.ts";
 import { startControlServer, sendControl } from "./control.ts";
@@ -73,8 +74,8 @@ async function launchUI() {
     volume: (d) => controlBus.emit("volume", d),
   });
 
-  // Ink UI.
-  runInkUI(player, tracks);
+  // Ink UI with the real-time audio analyzer (FFT visualizer).
+  runInkUI(player, tracks, new AudioAnalyzer());
 }
 
 function doctor() {

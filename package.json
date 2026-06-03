@@ -18,5 +18,6 @@
   "engines": {
     "bun": ">=1.3.0"
   },
+  "trustedDependencies": ["ffmpeg-static"],
   "license": "MIT"
 }
