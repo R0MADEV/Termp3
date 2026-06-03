@@ -13,7 +13,12 @@ import {
   setActivePlaylist,
   resolveTitles,
 } from "../../playlist.ts";
-import { theme } from "../../theme.ts";
+import {
+  theme,
+  listThemes,
+  activeThemeName,
+  setTheme,
+} from "../../theme.ts";
 import { t } from "../../i18n.ts";
 
 const SIDEBAR_W = 24;
@@ -165,6 +170,46 @@ function Panel({
   );
 }
 
+function ThemePicker({
+  names,
+  selected,
+  cols,
+  rows,
+}: {
+  names: string[];
+  selected: number;
+  cols: number;
+  rows: number;
+}) {
+  const accent = theme().accent;
+  return (
+    <Box width={cols} height={rows} justifyContent="center" alignItems="center">
+      <Box
+        borderStyle="round"
+        borderColor={accent}
+        flexDirection="column"
+        paddingX={2}
+        paddingY={1}
+      >
+        <Text bold color={accent}>
+          {t("ui.themesLabel").trim()}
+        </Text>
+        <Box flexDirection="column" marginTop={1}>
+          {names.map((n, i) => (
+            <Text key={n} color={i === selected ? accent : undefined}>
+              {i === selected ? "› " : "  "}
+              {n}
+            </Text>
+          ))}
+        </Box>
+        <Box marginTop={1}>
+          <Text dimColor>↑↓ · ↵ select · esc cancel</Text>
+        </Box>
+      </Box>
+    </Box>
+  );
+}
+
 function App({
   player,
   initialTracks,
@@ -186,6 +231,9 @@ function App({
   const [current, setCurrent] = useState(-1);
   const [state, setState] = useState({ ...player.state });
   const [spec, setSpec] = useState<number[]>(new Array(SPECTRUM_COLS).fill(0));
+  const [overlay, setOverlay] = useState<"none" | "theme">("none");
+  const [themeIdx, setThemeIdx] = useState(0);
+  const [, setThemeVersion] = useState(0); // bump to re-render after a theme change
 
   const play = useCallback(
     (i: number) => {
@@ -244,9 +292,31 @@ function App({
   }, [tracks.length]);
 
   useInput((input, key) => {
+    if (overlay === "theme") {
+      const names = listThemes();
+      if (key.upArrow) setThemeIdx((i) => Math.max(0, i - 1));
+      if (key.downArrow) setThemeIdx((i) => Math.min(names.length - 1, i + 1));
+      if (key.escape) setOverlay("none");
+      if (key.return) {
+        const name = names[themeIdx];
+        if (name) {
+          setTheme(name);
+          setThemeVersion((v) => v + 1);
+        }
+        setOverlay("none");
+      }
+      return;
+    }
+
     if (input === "q") {
       player.quit();
       exit();
+      return;
+    }
+    if (input === "o") {
+      const names = listThemes();
+      setThemeIdx(Math.max(0, names.indexOf(activeThemeName())));
+      setOverlay("theme");
       return;
     }
     if (key.tab) {
@@ -279,6 +349,17 @@ function App({
       setListIdx(0);
     }
   });
+
+  if (overlay === "theme") {
+    return (
+      <ThemePicker
+        names={listThemes()}
+        selected={themeIdx}
+        cols={cols}
+        rows={rows}
+      />
+    );
+  }
 
   const loading = !!state.url && state.position === 0 && !state.paused;
   const innerW = cols - 2;
@@ -326,7 +407,7 @@ function App({
       </Box>
       <Box paddingX={1}>
         <Text dimColor>
-          ↑↓ nav · ↵ play · space pause · n/p · Tab panel · q quit
+          ↑↓ nav · ↵ play · space pause · n/p · Tab panel · o theme · q quit
         </Text>
       </Box>
     </Box>
