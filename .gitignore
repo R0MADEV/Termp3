@@ -6,3 +6,4 @@ dist/
 # binarios descargados en runtime (yt-dlp, etc.)
 bin/
 .termp3/
+*.tgz

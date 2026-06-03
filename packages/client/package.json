@@ -1,7 +1,7 @@
 {
   "name": "termp3",
-  "version": "0.0.1",
-  "description": "Retro terminal music player: stream YouTube/radios without downloading, with synced rooms and turn-based DJ rotation.",
+  "version": "0.1.0",
+  "description": "Retro terminal music player with a real audio-reactive visualizer — stream YouTube & radios (no downloads), playlists, themes and multi-language.",
   "type": "module",
   "bin": {
     "termp3": "./dist/cli.js"
@@ -9,12 +9,22 @@
   "files": [
     "dist"
   ],
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/R0MADEV/Termp3.git"
+  },
+  "homepage": "https://github.com/R0MADEV/Termp3#readme",
+  "bugs": {
+    "url": "https://github.com/R0MADEV/Termp3/issues"
+  },
   "scripts": {
     "dev": "bun run src/cli.ts",
     "typecheck": "tsc --noEmit",
     "test": "bun test",
-    "build": "bun build src/cli.ts --target node --outfile dist/cli.js",
-    "build:binary": "bun build src/cli.ts --compile --outfile dist/termp3",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
     "prepublishOnly": "bun run build"
   },
   "keywords": [
