@@ -439,6 +439,8 @@ function App({
   const [input, setInput] = useState(""); // text-input overlays
   const [, bump] = useState(0); // force re-render after theme/lang change
   const prevPaused = useRef(false);
+  const specRef = useRef<number[]>(new Array(SPECTRUM_COLS).fill(0));
+  const waveRef = useRef<number[]>(new Array(WAVE_POINTS).fill(0));
 
   // --- playback ---
   const play = (i: number) => {
@@ -529,10 +531,16 @@ function App({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [player, tracks, current, shuffle, repeat]);
 
-  // Real frequency bands + waveform from the audio analyzer.
+  // The analyzer writes the latest data into refs (no re-render per event);
+  // a single render tick below pushes it to state. This keeps the visualizer
+  // updating smoothly regardless of how events batch.
   useEffect(() => {
-    const onBands = (b: number[]) => setSpec(b.map((v) => v * SPECTRUM_H));
-    const onWave = (w: number[]) => setWave(w);
+    const onBands = (b: number[]) => {
+      specRef.current = b.map((v) => v * SPECTRUM_H);
+    };
+    const onWave = (w: number[]) => {
+      waveRef.current = w;
+    };
     analyzer.on("bands", onBands);
     analyzer.on("wave", onWave);
     return () => {
@@ -541,18 +549,18 @@ function App({
     };
   }, [analyzer]);
 
-  // Animation frame counter (drives the plasma mode).
-  useEffect(() => {
-    const id = setInterval(() => setFrame((f) => f + 1), 120);
-    return () => clearInterval(id);
-  }, []);
-
-  // Decay the bars while paused/stopped.
+  // Single render tick: pushes analyzer data to state + animates plasma.
   useEffect(() => {
     const id = setInterval(() => {
-      if (!!player.state.url && !player.state.paused) return;
-      setSpec((prev) => prev.map((v) => Math.max(0, v - 0.6)));
-    }, 120);
+      const playing = !!player.state.url && !player.state.paused;
+      if (!playing) {
+        specRef.current = specRef.current.map((v) => Math.max(0, v - 0.6));
+      }
+      setSpec(specRef.current.slice());
+      setWave(waveRef.current);
+      setFrame((f) => f + 1);
+      setState({ ...player.state });
+    }, 90);
     return () => clearInterval(id);
   }, [player]);
 
