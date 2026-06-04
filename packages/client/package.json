@@ -14,11 +14,11 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/R0MADEV/Termp3.git"
+    "url": "git+https://github.com/R0MADEV/catunes.git"
   },
-  "homepage": "https://github.com/R0MADEV/Termp3#readme",
+  "homepage": "https://github.com/R0MADEV/catunes#readme",
   "bugs": {
-    "url": "https://github.com/R0MADEV/Termp3/issues"
+    "url": "https://github.com/R0MADEV/catunes/issues"
   },
   "scripts": {
     "dev": "bun run src/cli.ts",

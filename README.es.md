@@ -2,7 +2,7 @@
 
 > 🌍 [English](README.md) · **Español**
 
-[![CI](https://github.com/R0MADEV/Termp3/actions/workflows/ci.yml/badge.svg)](https://github.com/R0MADEV/Termp3/actions/workflows/ci.yml)
+[![CI](https://github.com/R0MADEV/catunes/actions/workflows/ci.yml/badge.svg)](https://github.com/R0MADEV/catunes/actions/workflows/ci.yml)
 
 Reproductor de música en terminal **retro**, con **salas sincronizadas**
 y **rotación de DJ por turnos** — escuchad juntos, desde la terminal.

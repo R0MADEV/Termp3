@@ -1,4 +1,4 @@
-// termp3 configuration paths (cross-platform).
+// catunes configuration paths (cross-platform).
 
 import { homedir } from "node:os";
 import { join } from "node:path";
@@ -10,7 +10,7 @@ import {
   copyFileSync,
 } from "node:fs";
 
-export const CONFIG_DIR = join(homedir(), ".config", "termp3");
+export const CONFIG_DIR = join(homedir(), ".config", "catunes");
 // Legacy single playlist (migrated into playlists/Default.txt on first run).
 export const PLAYLIST_FILE = join(CONFIG_DIR, "playlist.txt");
 // One file per named playlist lives here.
@@ -26,10 +26,10 @@ export const STATUS_FILE = join(CONFIG_DIR, "status.txt");
 // Control socket: lets you drive the running player from another tab.
 export const CONTROL_SOCKET =
   process.platform === "win32"
-    ? "\\\\.\\pipe\\termp3-control"
+    ? "\\\\.\\pipe\\catunes-control"
     : join(CONFIG_DIR, "control.sock");
 
-const DEFAULT_PLAYLIST = `# termp3 — playlist
+const DEFAULT_PLAYLIST = `# catunes — playlist
 # One URL (YouTube, radio, stream) or local file path per line.
 # Lines starting with # are comments.
 

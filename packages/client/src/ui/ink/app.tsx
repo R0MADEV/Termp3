@@ -46,7 +46,7 @@ const SPECTRUM_H = 6;
 const SPECTRUM_COLS = BANDS;
 const SEARCH_PRESETS = [10, 20, 30, 50, 100];
 
-/** Command bus so `termp3 pause/next/...` (another tab) can drive the UI. */
+/** Command bus so `catunes pause/next/...` (another tab) can drive the UI. */
 export const controlBus = new EventEmitter();
 
 function fmtTime(s: number): string {
@@ -1075,7 +1075,7 @@ function renderOverlay(
   }
   if (overlay.kind === "loading") {
     return (
-      <Modal title="termp3" cols={cols} rows={rows}>
+      <Modal title="catunes" cols={cols} rows={rows}>
         <Text color={accent}>{overlay.text}</Text>
       </Modal>
     );

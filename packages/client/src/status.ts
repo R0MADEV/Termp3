@@ -1,6 +1,6 @@
 // "Now playing" state in a file, for scriptable bars (tmux/zellij)
 // or any external integration. The player writes it every second;
-// `termp3 status` reads it.
+// `catunes status` reads it.
 //
 // This complements the terminal title (title.ts): the title covers
 // ANY terminal automatically; the file caters to anyone who wants to

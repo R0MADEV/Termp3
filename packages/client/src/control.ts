@@ -1,6 +1,6 @@
-// termp3 control socket.
+// catunes control socket.
 //
-// The running player opens a socket; `termp3 pause/next/prev/vol` connect
+// The running player opens a socket; `catunes pause/next/prev/vol` connect
 // to it and send commands. This lets you control the music from ANY
 // tab/pane without switching back to the player window.
 //

@@ -23,7 +23,7 @@ export function setTerminalTitle(text: string): void {
 
 /** Restores a neutral title. */
 export function clearTerminalTitle(): void {
-  setTerminalTitle("termp3");
+  setTerminalTitle("catunes");
 }
 
 /**
@@ -34,7 +34,7 @@ export function startTitleBroadcast(player: Player, intervalMs = 1000) {
   const update = () => {
     const s = player.state;
     if (!s.url) {
-      setTerminalTitle("termp3");
+      setTerminalTitle("catunes");
       return;
     }
     const icon = s.paused ? "⏸" : "♪";

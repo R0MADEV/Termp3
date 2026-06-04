@@ -52,14 +52,14 @@ export class Player extends EventEmitter {
     // Control socket: named pipe on Windows, unix socket everywhere else.
     this.socketPath =
       process.platform === "win32"
-        ? "\\\\.\\pipe\\termp3-mpv"
-        : join(tmpdir(), `termp3-mpv-${process.pid}.sock`);
+        ? "\\\\.\\pipe\\catunes-mpv"
+        : join(tmpdir(), `catunes-mpv-${process.pid}.sock`);
   }
 
   /** Starts the mpv process and opens the control channel. */
   async start(): Promise<void> {
     // Make sure mpv's ytdl_hook can find our (possibly auto-downloaded)
-    // yt-dlp by prepending termp3's bin dir to the child's PATH.
+    // yt-dlp by prepending catunes's bin dir to the child's PATH.
     const env = {
       ...process.env,
       PATH: `${YTDLP_DIR}${delimiter}${process.env.PATH ?? ""}`,

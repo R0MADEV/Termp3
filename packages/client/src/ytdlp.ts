@@ -2,7 +2,7 @@
 //
 // Resolution order:
 //   1. A system-wide yt-dlp on PATH (use it, download nothing).
-//   2. A previously downloaded copy in ~/.config/termp3/bin/.
+//   2. A previously downloaded copy in ~/.config/catunes/bin/.
 //   3. Otherwise, detect the OS + architecture and download the matching
 //      standalone binary from the official yt-dlp GitHub release.
 //

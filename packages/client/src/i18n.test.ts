@@ -22,12 +22,12 @@ test("falls back to the key when missing", () => {
   expect(t("nope.not.here")).toBe("nope.not.here");
 });
 
-test("detectLocale honors TERMP3_LANG and falls back to en", () => {
-  const prev = process.env.TERMP3_LANG;
-  process.env.TERMP3_LANG = "es";
+test("detectLocale honors CATUNES_LANG and falls back to en", () => {
+  const prev = process.env.CATUNES_LANG;
+  process.env.CATUNES_LANG = "es";
   expect(detectLocale()).toBe("es");
-  process.env.TERMP3_LANG = "fr"; // unsupported
+  process.env.CATUNES_LANG = "fr"; // unsupported
   expect(detectLocale()).toBe("en");
-  if (prev === undefined) delete process.env.TERMP3_LANG;
-  else process.env.TERMP3_LANG = prev;
+  if (prev === undefined) delete process.env.CATUNES_LANG;
+  else process.env.CATUNES_LANG = prev;
 });

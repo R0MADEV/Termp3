@@ -1,5 +1,5 @@
 // Detection of external dependencies (mpv, yt-dlp).
-// The termp3 core needs mpv to play; yt-dlp is optional
+// The catunes core needs mpv to play; yt-dlp is optional
 // (only for sources like YouTube). Here we locate them and, if missing,
 // give the user the exact installation command for their system.
 

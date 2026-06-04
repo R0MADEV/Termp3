@@ -3,7 +3,7 @@
 A **retro terminal music player** with a real **audio-reactive visualizer** —
 stream YouTube & radios (no downloads), with playlists, themes and multi-language.
 
-> Full docs & source: **https://github.com/R0MADEV/Termp3**
+> Full docs & source: **https://github.com/R0MADEV/catunes**
 
 ## Install
 

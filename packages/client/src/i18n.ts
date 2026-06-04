@@ -1,7 +1,7 @@
 // Lightweight i18n for catunes.
 //
 // English is the default. Add a new language by adding its dictionary to
-// MESSAGES. The active locale resolves from TERMP3_LANG, then the system
+// MESSAGES. The active locale resolves from CATUNES_LANG, then the system
 // LANG/LC_ALL, then falls back to English.
 //
 // Usage:  t("doctor.header")   ·   t("add.ok", { url })
@@ -248,10 +248,10 @@ CONTROLES (interfaz):
 
 let current: Locale | null = null;
 
-/** Resolve the locale from TERMP3_LANG, the system LANG/LC_ALL, or default en. */
+/** Resolve the locale from CATUNES_LANG, the system LANG/LC_ALL, or default en. */
 export function detectLocale(): Locale {
   const raw = (
-    process.env.TERMP3_LANG ||
+    process.env.CATUNES_LANG ||
     process.env.LANG ||
     process.env.LC_ALL ||
     ""

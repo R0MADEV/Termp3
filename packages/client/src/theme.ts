@@ -1,5 +1,5 @@
 // Color themes. Green is the default. Built-in themes plus user-defined ones
-// from ~/.config/termp3/themes.json (name -> { accent, spectrum }).
+// from ~/.config/catunes/themes.json (name -> { accent, spectrum }).
 
 import { existsSync, readFileSync } from "node:fs";
 import { THEMES_FILE, loadSettings, saveSettings } from "./config.ts";

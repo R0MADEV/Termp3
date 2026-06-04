@@ -1,4 +1,4 @@
-// termp3 relay server (rooms).
+// catunes relay server (rooms).
 //
 // It only forwards small TEXT messages between the members of a room
 // ("play this url at second X", "it's your turn", chat...). It NEVER
@@ -47,7 +47,7 @@ const server = Bun.serve<{ id: string; room?: string }, {}>({
     // Upgrade to WebSocket
     const id = crypto.randomUUID();
     if (server.upgrade(req, { data: { id } })) return;
-    return new Response("termp3 relay — connect via WebSocket", { status: 426 });
+    return new Response("catunes relay — connect via WebSocket", { status: 426 });
   },
   websocket: {
     open(ws) {
@@ -99,4 +99,4 @@ const server = Bun.serve<{ id: string; room?: string }, {}>({
   },
 });
 
-console.log(`termp3 relay listening on :${server.port}`);
+console.log(`catunes relay listening on :${server.port}`);

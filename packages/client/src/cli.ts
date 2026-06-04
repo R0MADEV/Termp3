@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// Entry point for termp3.
+// Entry point for catunes.
 //
 // Phase 0/1: player in SOLO mode. Plays a URL (YouTube, radio,
 // local file) with keyboard controls and a progress bar.
@@ -32,11 +32,11 @@ async function ensureYtDlpForTracks(tracks: { url: string }[]): Promise<void> {
 
 const VERSION = "0.1.0";
 
-// Apply the saved language (an explicit TERMP3_LANG env var still wins).
+// Apply the saved language (an explicit CATUNES_LANG env var still wins).
 {
   const saved = loadSettings().lang;
   if (
-    !process.env.TERMP3_LANG &&
+    !process.env.CATUNES_LANG &&
     saved &&
     (SUPPORTED_LOCALES as string[]).includes(saved)
   ) {
@@ -217,7 +217,7 @@ switch (cmd) {
     break;
   }
   case "vol": {
-    // termp3 vol +5  |  termp3 vol -5
+    // catunes vol +5  |  catunes vol -5
     const delta = arg ? Number(arg) : 0;
     if (!arg || Number.isNaN(delta)) {
       console.error(t("vol.usage"));
@@ -237,14 +237,14 @@ switch (cmd) {
   case "config": {
     const s = loadSettings();
     if (!arg) {
-      console.log("termp3 settings:");
+      console.log("catunes settings:");
       console.log(`  lang        = ${s.lang ?? "(auto)"}`);
       console.log(`  searchLimit = ${s.searchLimit ?? 20}`);
-      console.log("\nUsage: termp3 config <key> <value>  (keys: lang, searchLimit)");
+      console.log("\nUsage: catunes config <key> <value>  (keys: lang, searchLimit)");
       break;
     }
     if (arg2 === undefined) {
-      console.error("Usage: termp3 config <key> <value>  (keys: lang, searchLimit)");
+      console.error("Usage: catunes config <key> <value>  (keys: lang, searchLimit)");
       process.exit(1);
     }
     if (arg === "lang") {
