@@ -1,4 +1,4 @@
-# termp3 🎵
+# catunes 🎵
 
 A **retro terminal music player** with a real **audio-reactive visualizer** —
 stream YouTube & radios (no downloads), with playlists, themes and multi-language.
@@ -8,18 +8,18 @@ stream YouTube & radios (no downloads), with playlists, themes and multi-languag
 ## Install
 
 ```bash
-npm install -g termp3
+npm install -g catunes
 ```
 
 **Requirements:** [mpv](https://mpv.io) (audio engine). `yt-dlp` and `ffmpeg`
-are **auto-downloaded** on first use. Check with `termp3 doctor`.
+are **auto-downloaded** on first use. Check with `catunes doctor`.
 
 ## Use
 
 ```bash
-termp3                # open the player with your playlist
-termp3 add "<url>"    # add a track
-termp3 doctor         # check dependencies
+catunes                # open the player with your playlist
+catunes add "<url>"    # add a track
+catunes doctor         # check dependencies
 ```
 
 Inside the player: `↑↓` navigate · `↵` play · `space` pause · `/` search
@@ -35,7 +35,7 @@ YouTube · `a` add · `o` settings · `v` visualizer · `?` help · `q` quit.
 
 ## Disclaimer
 
-termp3 does **not** download, store or convert music — it only plays streams.
+catunes does **not** download, store or convert music — it only plays streams.
 Use it only with content you have the right to play, and respect each
 platform's terms of service.
 

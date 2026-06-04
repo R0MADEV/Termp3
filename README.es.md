@@ -1,4 +1,4 @@
-# termp3 🎵
+# catunes 🎵
 
 > 🌍 [English](README.md) · **Español**
 
@@ -20,15 +20,15 @@ y **rotación de DJ por turnos** — escuchad juntos, desde la terminal.
 - [mpv](https://mpv.io) — motor de audio (obligatorio).
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) — solo para YouTube y similares.
 
-Comprueba tu sistema con: `termp3 doctor`
+Comprueba tu sistema con: `catunes doctor`
 
 ---
 
 ## 👤 Para usuarios — instala y escucha
 
 ```bash
-npm install -g termp3        # o: bun add -g termp3
-termp3 play "https://www.youtube.com/watch?v=..."
+npm install -g catunes
+catunes play "https://www.youtube.com/watch?v=..."
 ```
 
 Controles: `espacio` pausa · `← →` seek · `+ -` volumen · `q` salir.
@@ -40,10 +40,10 @@ Controles: `espacio` pausa · `← →` seek · `+ -` volumen · `q` salir.
 No necesitas tmux ni zellij. Con un reproductor en marcha, desde cualquier panel:
 
 ```bash
-termp3 status     # qué suena ahora
-termp3 pause      # pausa / reanuda
-termp3 next       # siguiente
-termp3 vol +5     # volumen
+catunes status     # qué suena ahora
+catunes pause      # pausa / reanuda
+catunes next       # siguiente
+catunes vol +5     # volumen
 ```
 
 Además, el **título del terminal** muestra el tema actual en cualquier terminal
@@ -52,7 +52,7 @@ Además, el **título del terminal** muestra el tema actual en cualquier termina
 ### Temas 🎨
 
 Temas integrados (Green por defecto): elígelos en **Ajustes (`o`) → Tema**.
-Crea el tuyo editando `~/.config/termp3/themes.json`:
+Crea el tuyo editando `~/.config/catunes/themes.json`:
 
 ```json
 {
@@ -68,8 +68,8 @@ visualizador (nombres de color del terminal: green, yellow, red, cyan, blue…).
 ## 🛠️ Para desarrolladores — clona y corre
 
 ```bash
-git clone https://github.com/<tu-usuario>/termp3
-cd termp3
+git clone https://github.com/<tu-usuario>/catunes
+cd catunes
 bun install
 
 # Terminal 1 — relay de salas (Docker o nativo)
@@ -89,13 +89,13 @@ bun run dev:client play "https://www.youtube.com/watch?v=..."
 
 ```bash
 docker compose up -d                       # levanta el relay
-termp3 play ... --relay ws://tu-servidor:3000
+catunes play ... --relay ws://tu-servidor:3000
 ```
 
 ## Estructura
 
 ```
-termp3/
+catunes/
 ├── packages/
 │   ├── client/   # reproductor (TUI retro + mpv)  → nativo, npm/binario
 │   └── server/   # relay de salas (WebSocket)     → Docker
@@ -112,7 +112,7 @@ termp3/
 
 ## Aviso legal
 
-termp3 **no** almacena ni convierte música — solo reproduce streams.
+catunes **no** almacena ni convierte música — solo reproduce streams.
 Úsalo únicamente con contenido que tengas derecho a reproducir y respetando
 los términos de cada plataforma. El uso es responsabilidad de cada usuario.
 

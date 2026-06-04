@@ -1,10 +1,10 @@
 {
-  "name": "termp3",
+  "name": "catunes",
   "version": "0.1.0",
-  "description": "Retro terminal music player with a real audio-reactive visualizer — stream YouTube & radios (no downloads), playlists, themes and multi-language.",
+  "description": "Retro terminal music player with a real audio-reactive visualizer — stream YouTube & radios (no downloads), playlists, themes and multi-language. 🐱",
   "type": "module",
   "bin": {
-    "termp3": "./dist/cli.js"
+    "catunes": "dist/cli.js"
   },
   "files": [
     "dist"

@@ -1,4 +1,4 @@
-// Lightweight i18n for termp3.
+// Lightweight i18n for catunes.
 //
 // English is the default. Add a new language by adding its dictionary to
 // MESSAGES. The active locale resolves from TERMP3_LANG, then the system
@@ -20,27 +20,27 @@ type Dict = Record<string, string>;
 const MESSAGES: Record<Locale, Dict> = {
   en: {
     "help.body": `
-termp3 v{version} — terminal music player
+catunes v{version} — terminal music player
 
 USAGE:
-  termp3                Open the player interface with your playlist
-  termp3 add <url>      Add a URL to your playlist
-  termp3 play <url>     Play a single URL (line mode)
-  termp3 status         Print the "now playing"
-  termp3 setup          Download yt-dlp for your system (if needed)
-  termp3 config [k] [v] Show or change settings (lang, searchLimit)
-  termp3 doctor         Check dependencies (mpv, yt-dlp)
+  catunes                Open the player interface with your playlist
+  catunes add <url>      Add a URL to your playlist
+  catunes play <url>     Play a single URL (line mode)
+  catunes status         Print the "now playing"
+  catunes setup          Download yt-dlp for your system (if needed)
+  catunes config [k] [v] Show or change settings (lang, searchLimit)
+  catunes doctor         Check dependencies (mpv, yt-dlp)
 
 CONTROL FROM ANY TAB (with a player running):
-  termp3 pause          Pause / resume
-  termp3 next           Next track
-  termp3 prev           Previous track
-  termp3 vol +5         Raise/lower volume (+5 / -5)
+  catunes pause          Pause / resume
+  catunes next           Next track
+  catunes prev           Previous track
+  catunes vol +5         Raise/lower volume (+5 / -5)
 
 NOW PLAYING IN ANY TERMINAL:
-  While termp3 plays, it updates the terminal TITLE (Warp shows it in the tab
+  While catunes plays, it updates the terminal TITLE (Warp shows it in the tab
   bar; iTerm/kitty/Windows Terminal in the title).
-  termp3 --help         Show this help
+  catunes --help         Show this help
 
 PLAYLIST:
   Edit your songs (one URL per line) at:
@@ -52,17 +52,17 @@ CONTROLS (interface):
     "err.mpvMissing": "\n❌ mpv is not installed.\n   {hint}\n",
     "err.ytdlpYoutube":
       "\n⚠️  This looks like a YouTube URL and yt-dlp is not installed.\n   {hint}\n",
-    "err.missingUrlPlay": "Missing URL. Usage: termp3 play <url>",
-    "err.missingUrlAdd": "Missing URL. Usage: termp3 add <url>",
+    "err.missingUrlPlay": "Missing URL. Usage: catunes play <url>",
+    "err.missingUrlAdd": "Missing URL. Usage: catunes add <url>",
     "err.unknownCmd": "Unknown command: {cmd}",
     "playlist.empty": "\nYour playlist is empty. Add URLs at:\n  {file}\n",
-    "doctor.header": "\ntermp3 doctor — dependency status:\n",
+    "doctor.header": "\ncatunes doctor — dependency status:\n",
     "doctor.mpvOk": "  ✅ mpv      {version}",
     "doctor.mpvMissing": "  ❌ mpv      NOT found  →  {hint}",
     "doctor.ytOk": "  ✅ yt-dlp   {version}",
     "doctor.ytMissing":
       "  ⚠️  yt-dlp   not found  →  {hint}  (only needed for YouTube)",
-    "doctor.ytDownloaded": "  ✅ yt-dlp   downloaded by termp3 ({size} MB)",
+    "doctor.ytDownloaded": "  ✅ yt-dlp   downloaded by catunes ({size} MB)",
     "doctor.ytAuto":
       "  ⚙️  yt-dlp   not installed — will auto-download on first use ({asset})",
     "doctor.ready": "\n  Ready to play. 🎵\n",
@@ -71,8 +71,8 @@ CONTROLS (interface):
     "add.skip": "⚠️  Not added ({reason}).",
     "reason.empty": "empty URL",
     "reason.duplicate": "already in the list",
-    "ctl.noPlayer": "No active termp3 player.",
-    "vol.usage": "Usage: termp3 vol +5  (or -5)",
+    "ctl.noPlayer": "No active catunes player.",
+    "vol.usage": "Usage: catunes vol +5  (or -5)",
     "play.goodbye": "\n👋 see you\n",
     "deps.installFallback": "Install {dep} from its official site.",
     "ui.noSong": "— no song —",
@@ -133,27 +133,27 @@ CONTROLS (interface):
   },
   es: {
     "help.body": `
-termp3 v{version} — reproductor de musica en terminal
+catunes v{version} — reproductor de musica en terminal
 
 USO:
-  termp3                Abre la interfaz del reproductor con tu playlist
-  termp3 add <url>      Anade una URL a tu playlist
-  termp3 play <url>     Reproduce una URL suelta (modo linea)
-  termp3 status         Imprime el "ahora suena"
-  termp3 setup          Descarga yt-dlp para tu sistema (si hace falta)
-  termp3 config [k] [v] Ver o cambiar ajustes (lang, searchLimit)
-  termp3 doctor         Comprueba dependencias (mpv, yt-dlp)
+  catunes                Abre la interfaz del reproductor con tu playlist
+  catunes add <url>      Anade una URL a tu playlist
+  catunes play <url>     Reproduce una URL suelta (modo linea)
+  catunes status         Imprime el "ahora suena"
+  catunes setup          Descarga yt-dlp para tu sistema (si hace falta)
+  catunes config [k] [v] Ver o cambiar ajustes (lang, searchLimit)
+  catunes doctor         Comprueba dependencias (mpv, yt-dlp)
 
 CONTROL DESDE CUALQUIER PESTANA (con un reproductor en marcha):
-  termp3 pause          Pausa / reanuda
-  termp3 next           Siguiente cancion
-  termp3 prev           Cancion anterior
-  termp3 vol +5         Sube/baja el volumen (+5 / -5)
+  catunes pause          Pausa / reanuda
+  catunes next           Siguiente cancion
+  catunes prev           Cancion anterior
+  catunes vol +5         Sube/baja el volumen (+5 / -5)
 
 AHORA SUENA EN CUALQUIER TERMINAL:
-  Mientras termp3 reproduce, actualiza el TITULO del terminal (Warp lo muestra
+  Mientras catunes reproduce, actualiza el TITULO del terminal (Warp lo muestra
   en la barra de pestanas; iTerm/kitty/Windows Terminal en el titulo).
-  termp3 --help         Muestra esta ayuda
+  catunes --help         Muestra esta ayuda
 
 PLAYLIST:
   Edita tus canciones (una URL por linea) en:
@@ -165,17 +165,17 @@ CONTROLES (interfaz):
     "err.mpvMissing": "\n❌ mpv no esta instalado.\n   {hint}\n",
     "err.ytdlpYoutube":
       "\n⚠️  Esta URL parece de YouTube y yt-dlp no esta instalado.\n   {hint}\n",
-    "err.missingUrlPlay": "Falta la URL. Uso: termp3 play <url>",
-    "err.missingUrlAdd": "Falta la URL. Uso: termp3 add <url>",
+    "err.missingUrlPlay": "Falta la URL. Uso: catunes play <url>",
+    "err.missingUrlAdd": "Falta la URL. Uso: catunes add <url>",
     "err.unknownCmd": "Comando desconocido: {cmd}",
     "playlist.empty": "\nTu playlist esta vacia. Anade URLs en:\n  {file}\n",
-    "doctor.header": "\ntermp3 doctor — estado de dependencias:\n",
+    "doctor.header": "\ncatunes doctor — estado de dependencias:\n",
     "doctor.mpvOk": "  ✅ mpv      {version}",
     "doctor.mpvMissing": "  ❌ mpv      NO encontrado  →  {hint}",
     "doctor.ytOk": "  ✅ yt-dlp   {version}",
     "doctor.ytMissing":
       "  ⚠️  yt-dlp   no encontrado  →  {hint}  (solo necesario para YouTube)",
-    "doctor.ytDownloaded": "  ✅ yt-dlp   descargado por termp3 ({size} MB)",
+    "doctor.ytDownloaded": "  ✅ yt-dlp   descargado por catunes ({size} MB)",
     "doctor.ytAuto":
       "  ⚙️  yt-dlp   no instalado — se descargará al primer uso ({asset})",
     "doctor.ready": "\n  Listo para reproducir. 🎵\n",
@@ -184,8 +184,8 @@ CONTROLES (interfaz):
     "add.skip": "⚠️  No anadida ({reason}).",
     "reason.empty": "URL vacia",
     "reason.duplicate": "ya estaba en la lista",
-    "ctl.noPlayer": "No hay un reproductor termp3 activo.",
-    "vol.usage": "Uso: termp3 vol +5  (o -5)",
+    "ctl.noPlayer": "No hay un reproductor catunes activo.",
+    "vol.usage": "Uso: catunes vol +5  (o -5)",
     "play.goodbye": "\n👋 hasta luego\n",
     "deps.installFallback": "Instala {dep} desde su web oficial.",
     "ui.noSong": "— sin cancion —",

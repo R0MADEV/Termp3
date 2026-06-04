@@ -479,7 +479,7 @@ function App({
   const waveRef = useRef<number[]>(new Array(WAVE_POINTS).fill(0));
   const inflight = useRef(new Set<string>()); // URLs whose title is resolving
   // Rows available for list items (NowPlaying ~13 + status + borders/title).
-  const panelMax = Math.max(3, rows - 18);
+  const panelMax = Math.max(3, rows - 19);
 
   // --- playback ---
   const play = (i: number) => {
@@ -919,6 +919,10 @@ function App({
 
   return (
     <Box flexDirection="column" width={cols} height={rows}>
+      <Text bold color={accent}>
+        {" "}
+        ᓚᘏᗢ catunes
+      </Text>
       <NowPlaying
         state={state}
         spec={spec}
