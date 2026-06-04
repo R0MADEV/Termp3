@@ -36,6 +36,44 @@ const DEFAULT_PLAYLIST = `# catunes — playlist
 https://www.youtube.com/watch?v=dQw4w9WgXcQ
 `;
 
+// A few free, legal internet-radio streams (verified public Icecast streams,
+// no account) so a fresh install isn't empty. Each has a friendly name shown in
+// the UI. Add your own (incl. Spanish) with `a` or `catunes add "<url>"`.
+const RADIO_STATIONS: { url: string; title: string; genre: string }[] = [
+  { url: "https://stream.radioparadise.com/mp3-128", title: "Radio Paradise — Main Mix", genre: "📻 eclectic" },
+  { url: "https://stream.radioparadise.com/rock-128", title: "Radio Paradise — Rock Mix", genre: "📻 rock" },
+  { url: "https://stream.radioparadise.com/mellow-128", title: "Radio Paradise — Mellow Mix", genre: "📻 mellow" },
+  { url: "https://stream.radioparadise.com/world-etc-128", title: "Radio Paradise — World/Etc", genre: "📻 world" },
+  { url: "https://ice1.somafm.com/groovesalad-128-mp3", title: "SomaFM — Groove Salad", genre: "📻 downtempo" },
+  { url: "https://ice1.somafm.com/indiepop-128-mp3", title: "SomaFM — Indie Pop Rocks", genre: "📻 indie pop" },
+  { url: "https://ice1.somafm.com/u80s-128-mp3", title: "SomaFM — Underground 80s", genre: "📻 80s" },
+  { url: "https://ice1.somafm.com/bootliquor-128-mp3", title: "SomaFM — Boot Liquor", genre: "📻 country" },
+  { url: "https://ice1.somafm.com/dronezone-128-mp3", title: "SomaFM — Drone Zone", genre: "📻 ambient" },
+];
+
+const RADIOS_PLAYLIST =
+  "# catunes — example radios (free public streams)\n" +
+  RADIO_STATIONS.map((s) => s.url).join("\n") +
+  "\n";
+
+// Pre-fills the title cache with the radios' friendly names so they show nicely
+// (instead of the raw stream URL). duration 0 / artist set = "fully resolved".
+function seedRadioTitles(): void {
+  let cache: Record<string, unknown> = {};
+  if (existsSync(TITLES_CACHE)) {
+    try {
+      cache = JSON.parse(readFileSync(TITLES_CACHE, "utf8"));
+    } catch {
+      cache = {};
+    }
+  }
+  // Always set: these are our curated names, so overwrite any earlier raw title.
+  for (const s of RADIO_STATIONS) {
+    cache[s.url] = { title: s.title, duration: 0, artist: s.genre };
+  }
+  writeFileSync(TITLES_CACHE, JSON.stringify(cache, null, 2));
+}
+
 /**
  * Creates the config + playlists directories and ensures a "Default" playlist
  * exists, migrating the legacy playlist.txt the first time.
@@ -48,6 +86,14 @@ export function ensureConfig(): void {
   if (!existsSync(defaultFile)) {
     if (existsSync(PLAYLIST_FILE)) copyFileSync(PLAYLIST_FILE, defaultFile);
     else writeFileSync(defaultFile, DEFAULT_PLAYLIST);
+  }
+
+  // Seed a "Radios" example list (only if it doesn't exist) so there's always
+  // something to play out of the box.
+  const radiosFile = join(PLAYLISTS_DIR, "Radios.txt");
+  if (!existsSync(radiosFile)) {
+    writeFileSync(radiosFile, RADIOS_PLAYLIST);
+    seedRadioTitles();
   }
 
   // Drop a sample custom theme so the format is discoverable.

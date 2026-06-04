@@ -799,25 +799,29 @@ function App({
     setSel(0);
     setOverlay({ kind: "searchResults", results });
   };
-  // Lists panel: import a playlist (or make a 1-track list) as a NEW list.
-  const importList = async (url: string) => {
+  const openList = (name: string) => {
+    setPlaylists(listPlaylists());
+    setSideIdx(Math.max(0, listPlaylists().indexOf(name)));
+    switchPlaylist(name);
+    setOverlay({ kind: "none" });
+  };
+
+  // Lists panel: a plain name creates an EMPTY list to fill later; a URL imports
+  // a YouTube playlist (or makes a 1-track list).
+  const importList = async (value: string) => {
+    if (!/^https?:\/\//i.test(value)) {
+      return openList(createPlaylist(value, []));
+    }
+    const url = value;
     setOverlay({ kind: "loading", text: t("ui.importing") });
     await ensureYtDlp(() => {});
     if (isPlaylistUrl(url)) {
       const { name, entries } = await fetchPlaylist(url);
       if (entries.length === 0) return setOverlay({ kind: "none" });
       cacheTitles(entries); // titles persist → instant on reopen, no storm
-      const created = createPlaylist(name, entries.map((e) => e.url));
-      setPlaylists(listPlaylists());
-      setSideIdx(Math.max(0, listPlaylists().indexOf(created)));
-      switchPlaylist(created);
-    } else {
-      const created = createPlaylist("New playlist", [singleVideoUrl(url)]);
-      setPlaylists(listPlaylists());
-      setSideIdx(Math.max(0, listPlaylists().indexOf(created)));
-      switchPlaylist(created);
+      return openList(createPlaylist(name, entries.map((e) => e.url)));
     }
-    setOverlay({ kind: "none" });
+    openList(createPlaylist("New playlist", [singleVideoUrl(url)]));
   };
 
   // Tracks panel: add a single track to the active playlist (never a playlist).
