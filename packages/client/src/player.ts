@@ -16,6 +16,19 @@ import { tmpdir } from "node:os";
 import { join, delimiter } from "node:path";
 import { YTDLP_DIR } from "./ytdlp.ts";
 
+/** 10-band graphic-equalizer center frequencies (Hz). */
+export const EQ_BANDS = [31, 62, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+
+/** Builds the mpv audio-filter value for a set of EQ gains (dB). "" = flat. */
+export function eqFilterChain(gains: number[]): string {
+  if (!gains.some((g) => Math.abs(g) > 0.01)) return "";
+  const chain = EQ_BANDS.map(
+    (f, i) =>
+      `equalizer=f=${f}:width_type=o:width=1:g=${(gains[i] ?? 0).toFixed(1)}`,
+  ).join(",");
+  return `lavfi=[${chain}]`;
+}
+
 export interface PlayerState {
   url: string | null;
   title: string | null;
@@ -195,6 +208,14 @@ export class Player extends EventEmitter {
     const v = Math.max(0, Math.min(100, volume));
     this.state.volume = v;
     this.send({ command: ["set_property", "volume", v] });
+  }
+
+  /**
+   * Applies a 10-band graphic equalizer (gains in dB) via mpv's audio-filter
+   * chain. All-zero gains clear the filter so there's no extra processing.
+   */
+  setEqualizer(gains: number[]) {
+    this.send({ command: ["set_property", "af", eqFilterChain(gains)] });
   }
 
   stop() {

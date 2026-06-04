@@ -6,6 +6,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { EventEmitter } from "node:events";
 import { render, Box, Text, useApp, useInput, useStdout } from "ink";
 import type { Player } from "../../player.ts";
+import { EQ_BANDS } from "../../player.ts";
 import {
   type Track,
   type SearchResult,
@@ -45,6 +46,19 @@ const SIDEBAR_W = 24;
 const SPECTRUM_H = 6;
 const SPECTRUM_COLS = BANDS;
 const SEARCH_PRESETS = [10, 20, 30, 50, 100];
+
+// 10-band equalizer presets (dB per band: 31Hz … 16kHz).
+const EQ_PRESETS: { name: string; gains: number[] }[] = [
+  { name: "Flat", gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
+  { name: "Bass Boost", gains: [7, 6, 5, 3, 1, 0, 0, 0, 0, 0] },
+  { name: "Treble", gains: [0, 0, 0, 0, 0, 1, 3, 5, 6, 7] },
+  { name: "Vocal", gains: [-2, -1, 0, 2, 4, 4, 3, 1, 0, -1] },
+  { name: "Rock", gains: [5, 4, 2, 0, -1, -1, 1, 3, 4, 5] },
+  { name: "Jazz", gains: [3, 2, 1, 2, -1, -1, 0, 1, 2, 3] },
+  { name: "Classical", gains: [4, 3, 2, 0, 0, 0, -1, -1, 2, 3] },
+  { name: "Loudness", gains: [6, 4, 0, 0, -2, 0, 0, 2, 5, 6] },
+];
+const EQ_LABELS = ["31", "62", "125", "250", "500", "1k", "2k", "4k", "8k", "16k"];
 
 /** Command bus so `catunes pause/next/...` (another tab) can drive the UI. */
 export const controlBus = new EventEmitter();
@@ -118,35 +132,41 @@ function bandColor(i: number): string {
   return i < SPECTRUM_COLS / 3 ? low! : i < (2 * SPECTRUM_COLS) / 3 ? mid! : high!;
 }
 
-function vizBars(spec: number[]): React.ReactNode[] {
+function vizBars(spec: number[], peaks: number[]): React.ReactNode[] {
   const rows: React.ReactNode[] = [];
   for (let level = SPECTRUM_H - 1; level >= 0; level--) {
     const cells: React.ReactNode[] = [];
-    for (let i = 0; i < SPECTRUM_COLS; i++)
+    for (let i = 0; i < SPECTRUM_COLS; i++) {
+      const filled = (spec[i] ?? 0) > level;
+      const cap = !filled && Math.floor(peaks[i] ?? 0) === level && (peaks[i] ?? 0) > 0.3;
       cells.push(
-        <Text key={i} color={bandColor(i)}>
-          {(spec[i] ?? 0) > level ? "█" : " "}
+        <Text key={i} color={bandColor(i)} dimColor={cap}>
+          {filled ? "█" : cap ? "▀" : " "}
         </Text>,
       );
+    }
     rows.push(<Box key={level}>{cells}</Box>);
   }
   return rows;
 }
 
-function vizSmooth(spec: number[]): React.ReactNode[] {
+function vizSmooth(spec: number[], peaks: number[]): React.ReactNode[] {
   const rows: React.ReactNode[] = [];
   for (let level = SPECTRUM_H - 1; level >= 0; level--) {
     const cells: React.ReactNode[] = [];
     for (let i = 0; i < SPECTRUM_COLS; i++) {
       const h = spec[i] ?? 0;
+      const cap = h <= level && Math.floor(peaks[i] ?? 0) === level && (peaks[i] ?? 0) > 0.3;
       const ch =
         h >= level + 1
           ? "█"
           : h > level
             ? LEVELS[Math.min(7, Math.floor((h - level) * 8))]
-            : " ";
+            : cap
+              ? "▀"
+              : " ";
       cells.push(
-        <Text key={i} color={bandColor(i)}>
+        <Text key={i} color={bandColor(i)} dimColor={cap}>
           {ch}
         </Text>,
       );
@@ -212,24 +232,26 @@ function vizPlasma(frame: number, energy: number): React.ReactNode[] {
 function Visualizer({
   mode,
   spec,
+  peaks,
   wave,
   frame,
   playing,
 }: {
   mode: string;
   spec: number[];
+  peaks: number[];
   wave: number[];
   frame: number;
   playing: boolean;
 }) {
   let rows: React.ReactNode[];
   if (mode === "mirror") rows = vizMirror(spec);
-  else if (mode === "smooth") rows = vizSmooth(spec);
+  else if (mode === "smooth") rows = vizSmooth(spec, peaks);
   else if (mode === "scope") rows = vizScope(wave);
   else if (mode === "plasma") {
     const energy = spec.reduce((a, b) => a + b, 0) / (spec.length * SPECTRUM_H);
     rows = vizPlasma(frame, playing ? Math.max(0.15, energy) : 0.1);
-  } else rows = vizBars(spec);
+  } else rows = vizBars(spec, peaks);
   return <Box flexDirection="column">{rows}</Box>;
 }
 
@@ -246,53 +268,157 @@ function catMascot(playing: boolean, paused: boolean, beat: number): string {
 }
 
 // --- Cat mascot (top-right, themed) ---
-// Block-art sitting cat with ears, face, arms and paws. Drawn in the theme
-// accent; the eyes react to the player state and the beat.
+// Block-art sitting cat with face, whiskers, arms and paws. The eyes react to
+// the player state/beat (and wink/scare on actions); a progress "aura" ring
+// fills clockwise around the cat as the track plays.
+const CAT_ROWS = [
+  "        ▄▀▄       ▄▀▄",
+  "       █   ▀▄▄▄▄▄▀   █",
+  null, // eye row (rendered with white eyeballs)
+  " ───  █       ▄       █  ───",
+  " ──    █    ▀▀▀▀▀    █   ──",
+  "        ▀▄▄▄▄▄▄▄▄▄▄▄▀",
+  "▄▄▄▄▄▄▄▄█   █   █   █▄▄▄▄▄▄▄▄",
+  "        ▀▄▄▄▀   ▀▄▄▄▀",
+] as const;
+const CAT_W = 29;
+const CAT_H = CAT_ROWS.length;
+
 function PixelCat({
   mode,
   beat,
   frame,
+  ratio,
+  reaction,
+  muted,
+  shuffle,
+  repeat,
 }: {
   mode: "play" | "pause" | "stop";
   beat: number;
   frame: number;
+  ratio: number;
+  reaction: "wink" | "scared" | "meow" | null;
+  muted: boolean;
+  shuffle: boolean;
+  repeat: "off" | "all" | "one";
 }) {
   const accent = theme().accent;
-  // Realistic eye: a white eyeball with a dark pupil that glances around,
-  // blinks, and widens on a strong beat. Closed (a lid line) on pause/blink.
-  const closed = mode === "pause" || frame % 28 < 2;
-  const pupil =
-    mode === "play" && beat > 0.5
-      ? "●" // wide
+  const blink = frame % 28 < 2;
+  const strong = mode === "play" && beat > 0.45; // a beat hit
+  let pupil =
+    beat > 0.5
+      ? "●"
       : ((look) => (look === 1 ? "◗" : look === 3 ? "◖" : "●"))(
           Math.floor(frame / 7) % 4,
         );
-  const Eye = () =>
-    closed ? (
-      <Text color={accent}>‿</Text>
+  if (shuffle) pupil = "✦"; // excited on shuffle
+  if (repeat === "one") pupil = "@"; // dizzy on repeat-one
+  const base: "open" | "closed" | "wide" =
+    blink || mode === "pause" || mode === "stop"
+      ? "closed"
+      : strong
+        ? "wide"
+        : "open";
+  let left = base;
+  let right = base;
+  if (reaction === "wink") right = "closed";
+  else if (reaction === "scared") left = right = "wide";
+
+  // Animated, fixed-width body parts (so the aura frame never shifts).
+  const ears = muted ? "╲█╱" : strong ? "▀▄▀" : "▄▀▄"; // dance / cover ears
+  const mouth = strong ? "▄███▄" : "▀▀▀▀▀"; // sing on the beat
+  const paw = frame % 55 < 3 ? "▄▀▀▀▄" : "▀▄▄▄▀"; // an occasional paw flick (~5s)
+  const dyn: Record<number, string> = {
+    0: `        ${ears}       ${ears}`,
+    4: ` ──    █    ${mouth}    █   ──`,
+    7: `        ${paw}   ${paw}`,
+  };
+  // Speech bubble above the cat (reserved line; constant presence).
+  const cyc = (a: string[]) => a[Math.floor(frame / 5) % a.length]!;
+  const bubble = muted
+    ? "🙀 mute"
+    : reaction === "meow"
+      ? "meow!"
+      : mode === "play"
+        ? cyc(["  ♪  ", " ♪ ♫ ", " ♫ ♪ "])
+        : cyc(["  z  ", " z Z ", "z Z z"]);
+  const eye = (k: "open" | "closed" | "wide", key: string) =>
+    k === "closed" ? (
+      <Text key={key} color={accent}>
+        ‿
+      </Text>
     ) : (
-      <Text color="#1b1b1b" backgroundColor="white">
-        {pupil}
+      <Text key={key} color="#1b1b1b" backgroundColor="white">
+        {k === "wide" ? "◉" : pupil}
       </Text>
     );
-  // All rows are aligned on the same grid: the face walls (█) sit at the same
-  // columns on every row so nothing drifts. Whiskers stick out at the cheeks.
+
+  // Progress aura: perimeter cells lit clockwise from the top-left corner.
+  const total = 2 * CAT_W + 2 * CAT_H + 4;
+  const filled = Math.round(Math.max(0, Math.min(1, ratio)) * total);
+  const lit = (seq: number) => seq < filled;
+  const hcell = (seq: number, key: number) => (
+    <Text key={key} color={accent} dimColor={!lit(seq)}>
+      {lit(seq) ? "━" : "─"}
+    </Text>
+  );
+  const vcell = (seq: number) => (
+    <Text color={accent} dimColor={!lit(seq)}>
+      {lit(seq) ? "┃" : "│"}
+    </Text>
+  );
+  const ccell = (seq: number, ch: string) => (
+    <Text color={accent} dimColor={!lit(seq)}>
+      {ch}
+    </Text>
+  );
+  // Sequence indices (clockwise): TL=0, top 1..W, TR=W+1, right W+2..W+1+H,
+  // BR=W+2+H, bottom (R→L), BL=2W+3+H, left (B→T).
+  const rightSeq = (r: number) => CAT_W + 2 + r;
+  const leftSeq = (r: number) => 2 * CAT_W + 4 + CAT_H + (CAT_H - 1 - r);
+  const bottomSeq = (c: number) => CAT_W + 3 + CAT_H + (CAT_W - 1 - c);
+
+  const inner = (r: number) => {
+    if (r !== 2) {
+      const s = dyn[r] ?? CAT_ROWS[r]!;
+      return <Text color={accent}>{s.padEnd(CAT_W)}</Text>;
+    }
+    return (
+      <>
+        <Text color={accent}>{"      █  "}</Text>
+        {eye(left, "l")}
+        <Text color={accent}>{"         "}</Text>
+        {eye(right, "r")}
+        <Text color={accent}>{"  █      "}</Text>
+      </>
+    );
+  };
+
   return (
     <Box flexDirection="column">
-      <Text color={accent}>{"        ▄▀▄       ▄▀▄"}</Text>
-      <Text color={accent}>{"       █   ▀▄▄▄▄▄▀   █"}</Text>
-      <Box>
-        <Text color={accent}>{"      █  "}</Text>
-        <Eye />
-        <Text color={accent}>{"         "}</Text>
-        <Eye />
-        <Text color={accent}>{"  █"}</Text>
+      <Box justifyContent="center">
+        <Text color={accent} bold>
+          {bubble}
+        </Text>
       </Box>
-      <Text color={accent}>{" ───  █       ▄       █  ───"}</Text>
-      <Text color={accent}>{" ──    █    ▀▀▀▀▀    █   ──"}</Text>
-      <Text color={accent}>{"        ▀▄▄▄▄▄▄▄▄▄▄▄▀"}</Text>
-      <Text color={accent}>{"▄▄▄▄▄▄▄▄█   █   █   █▄▄▄▄▄▄▄▄"}</Text>
-      <Text color={accent}>{"        ▀▄▄▄▀   ▀▄▄▄▀"}</Text>
+      <Box>
+        {ccell(0, "╭")}
+        {Array.from({ length: CAT_W }, (_, c) => hcell(1 + c, c))}
+        {ccell(CAT_W + 1, "╮")}
+      </Box>
+      {CAT_ROWS.map((_, r) => (
+        <Box key={r}>
+          {vcell(leftSeq(r))}
+          {inner(r)}
+          {vcell(rightSeq(r))}
+        </Box>
+      ))}
+      <Box>
+        {ccell(2 * CAT_W + 3 + CAT_H, "╰")}
+        {Array.from({ length: CAT_W }, (_, c) => hcell(bottomSeq(c), c))}
+        {ccell(CAT_W + 2 + CAT_H, "╯")}
+      </Box>
     </Box>
   );
 }
@@ -300,6 +426,7 @@ function PixelCat({
 function NowPlaying({
   state,
   spec,
+  peaks,
   wave,
   frame,
   mode,
@@ -308,9 +435,11 @@ function NowPlaying({
   repeat,
   width,
   artist,
+  reaction,
 }: {
   state: Player["state"];
   spec: number[];
+  peaks: number[];
   wave: number[];
   frame: number;
   mode: string;
@@ -319,6 +448,7 @@ function NowPlaying({
   repeat: "off" | "all" | "one";
   width: number;
   artist?: string;
+  reaction: "wink" | "scared" | "meow" | null;
 }) {
   const accent = theme().accent;
   const dur = fmtTime(state.duration);
@@ -332,7 +462,7 @@ function NowPlaying({
         : `■  ${t("ui.state.stop")}`;
   const repIcon = repeat === "one" ? "🔂" : "🔁";
   const ratio = state.duration > 0 ? state.position / state.duration : 0;
-  const progW = Math.max(10, width - 52);
+  const progW = Math.max(10, width - 56);
   const bass =
     spec.length >= 3 ? (spec[0]! + spec[1]! + spec[2]!) / (3 * SPECTRUM_H) : 0;
   const cat = loading
@@ -365,6 +495,7 @@ function NowPlaying({
           <Visualizer
             mode={mode}
             spec={spec}
+            peaks={peaks}
             wave={wave}
             frame={frame}
             playing={!!state.url && !state.paused}
@@ -389,7 +520,16 @@ function NowPlaying({
         alignItems="center"
         justifyContent="center"
       >
-        <PixelCat mode={catMode} beat={bass} frame={frame} />
+        <PixelCat
+          mode={catMode}
+          beat={bass}
+          frame={frame}
+          ratio={ratio}
+          reaction={reaction}
+          muted={state.volume === 0}
+          shuffle={shuffle}
+          repeat={repeat}
+        />
       </Box>
     </Box>
   );
@@ -558,6 +698,7 @@ type Overlay =
   | { kind: "playlists" }
   | { kind: "searchLimit" }
   | { kind: "help" }
+  | { kind: "eq" }
   | { kind: "searchInput" }
   | { kind: "addInput"; target: "track" | "list" }
   | { kind: "searchResults"; results: SearchResult[] }
@@ -588,12 +729,19 @@ function App({
   const [current, setCurrent] = useState(-1);
   const [state, setState] = useState({ ...player.state });
   const [spec, setSpec] = useState<number[]>(new Array(SPECTRUM_COLS).fill(0));
+  const [peaks, setPeaks] = useState<number[]>(new Array(SPECTRUM_COLS).fill(0));
   const [wave, setWave] = useState<number[]>(new Array(WAVE_POINTS).fill(0));
   const [frame, setFrame] = useState(0);
   const [mode, setMode] = useState<string>(loadSettings().vizMode ?? "bars");
   const [shuffle, setShuffle] = useState(false);
   const [repeat, setRepeat] = useState<"off" | "all" | "one">("all");
+  const [eq, setEq] = useState<number[]>(
+    loadSettings().eqGains ?? new Array(EQ_BANDS.length).fill(0),
+  );
+  const [eqBand, setEqBand] = useState(0);
   const [mutedVol, setMutedVol] = useState<number | null>(null);
+  const [filter, setFilter] = useState(""); // filter text for the current list
+  const [filtering, setFiltering] = useState(false); // editing the filter
 
   const [overlay, setOverlay] = useState<Overlay>({ kind: "none" });
   const [sel, setSel] = useState(0); // selection index inside list overlays
@@ -601,10 +749,29 @@ function App({
   const [, bump] = useState(0); // force re-render after theme/lang change
   const prevPaused = useRef(false);
   const specRef = useRef<number[]>(new Array(SPECTRUM_COLS).fill(0));
+  const smoothRef = useRef<number[]>(new Array(SPECTRUM_COLS).fill(0));
+  const peakRef = useRef<number[]>(new Array(SPECTRUM_COLS).fill(0));
+  const errRef = useRef(0); // consecutive failed tracks (stop if all unavailable)
   const waveRef = useRef<number[]>(new Array(WAVE_POINTS).fill(0));
   const inflight = useRef(new Set<string>()); // URLs whose title is resolving
+  // Transient cat reaction (wink/scared); cleared once the deadline frame passes.
+  const reactRef = useRef<{ type: "wink" | "scared" | "meow"; until: number }>({
+    type: "wink",
+    until: 0,
+  });
+  const react = (type: "wink" | "scared" | "meow") => {
+    reactRef.current = { type, until: frame + 10 }; // ~0.9s
+  };
   // Rows available for list items (NowPlaying ~13 + status + borders/title).
   const panelMax = Math.max(3, rows - 19);
+  // Filtered view: indices into `tracks` that match the filter (all if none).
+  const filt = filter.trim().toLowerCase();
+  const viewIdx = filt
+    ? tracks.reduce<number[]>((acc, t, i) => {
+        if (t.title.toLowerCase().includes(filt)) acc.push(i);
+        return acc;
+      }, [])
+    : tracks.map((_, i) => i);
 
   // --- playback ---
   const play = (i: number) => {
@@ -612,6 +779,7 @@ function App({
     if (!tr) return;
     setCurrent(i);
     setListIdx(i);
+    react("meow"); // the cat greets a new track
     try {
       player.load(tr.url);
       analyzer.start(tr.url, 0);
@@ -646,8 +814,17 @@ function App({
     player.setVolume(v);
     saveSettings({ volume: player.state.volume });
   };
+  const applyEq = (next: number[]) => {
+    setEq(next);
+    saveSettings({ eqGains: next });
+  };
 
   // --- effects ---
+  // Apply the equalizer to mpv on mount and whenever a band changes.
+  useEffect(() => {
+    player.setEqualizer(eq);
+  }, [eq, player]);
+
   useEffect(() => {
     const onState = () => {
       // Keep the analyzer in sync with pause/resume.
@@ -657,11 +834,19 @@ function App({
         if (paused) analyzer.pause();
         else analyzer.resume();
       }
+      // A track that actually plays clears the unavailable-streak counter.
+      if (player.state.position > 3) errRef.current = 0;
       setState({ ...player.state });
     };
     const onEnded = (r: string) => {
-      if (r === "eof") advance(true);
-      else if (r === "error") advance(false);
+      if (r === "eof") {
+        errRef.current = 0;
+        advance(true);
+      } else if (r === "error") {
+        // Skip an unavailable track, but stop if the whole list is failing.
+        errRef.current++;
+        if (errRef.current <= tracks.length) advance(false);
+      }
     };
     player.on("state", onState);
     player.on("ended", onEnded);
@@ -715,7 +900,17 @@ function App({
       if (!playing) {
         specRef.current = specRef.current.map((v) => Math.max(0, v - 0.6));
       }
-      setSpec(specRef.current.slice());
+      // Attack fast, release slow → smoother bars; peak caps fall gently.
+      const sm = smoothRef.current;
+      const pk = peakRef.current;
+      const tgt = specRef.current;
+      for (let i = 0; i < sm.length; i++) {
+        const t = tgt[i] ?? 0;
+        sm[i] = t > sm[i]! ? t : sm[i]! * 0.72 + t * 0.28;
+        pk[i] = Math.max(sm[i]!, pk[i]! - 0.12);
+      }
+      setSpec(sm.slice());
+      setPeaks(pk.slice());
       setWave(waveRef.current);
       setFrame((f) => f + 1);
       setState({ ...player.state });
@@ -741,7 +936,14 @@ function App({
 
   // Lazily resolve titles only for the visible window (+ a small buffer).
   useEffect(() => {
-    const n = tracks.length;
+    const f = filter.trim().toLowerCase();
+    const view = f
+      ? tracks.reduce<number[]>((a, t, i) => {
+          if (t.title.toLowerCase().includes(f)) a.push(i);
+          return a;
+        }, [])
+      : tracks.map((_, i) => i);
+    const n = view.length;
     if (n === 0) return;
     const max = Math.min(panelMax, n);
     const start =
@@ -749,7 +951,8 @@ function App({
     const from = Math.max(0, start - 5);
     const to = Math.min(n, start + max + 5);
     const idxs: number[] = [];
-    for (let i = from; i < to; i++) {
+    for (let d = from; d < to; d++) {
+      const i = view[d]!;
       const tr = tracks[i];
       if (!tr || inflight.current.has(tr.url)) continue;
       // Resolve missing titles; also backfill duration for remote tracks that
@@ -774,7 +977,7 @@ function App({
     ).finally(() => {
       for (const u of urls) inflight.current.delete(u);
     });
-  }, [listIdx, tracks, panelMax]);
+  }, [listIdx, tracks, panelMax, filter]);
 
   const quit = () => {
     const tr = tracks[current];
@@ -828,6 +1031,7 @@ function App({
   const addTrack = (url: string) => {
     addUrl(singleVideoUrl(url));
     reload();
+    react("wink"); // the cat winks when you add a track
     setOverlay({ kind: "none" });
   };
 
@@ -842,6 +1046,35 @@ function App({
   useInput((ch, key) => {
     // Overlays first.
     if (overlay.kind === "loading") return;
+
+    // Live filter editing for the current list.
+    if (filtering) {
+      if (key.escape) {
+        setFilter("");
+        setFiltering(false);
+        setListIdx(0);
+        return;
+      }
+      if (key.return) {
+        setFiltering(false);
+        if (viewIdx[listIdx] != null) play(viewIdx[listIdx]!);
+        return;
+      }
+      if (key.upArrow) return setListIdx((i) => Math.max(0, i - 1));
+      if (key.downArrow)
+        return setListIdx((i) => Math.min(viewIdx.length - 1, i + 1));
+      if (key.backspace || key.delete) {
+        setFilter((s) => s.slice(0, -1));
+        setListIdx(0);
+        return;
+      }
+      if (ch && !key.ctrl && !key.meta) {
+        setFilter((s) => s + ch);
+        setListIdx(0);
+        return;
+      }
+      return;
+    }
 
     if (overlay.kind === "searchInput" || overlay.kind === "addInput") {
       if (key.escape) return closeOverlay();
@@ -865,6 +1098,7 @@ function App({
         removeUrl(tracks[overlay.index]!.url);
         if (current === overlay.index) setCurrent(-1);
         reload();
+        react("scared"); // the cat is startled when you delete
       }
       return closeOverlay();
     }
@@ -874,6 +1108,7 @@ function App({
         const remaining = listPlaylists();
         setPlaylists(remaining);
         if (activePlaylist() === overlay.name) switchPlaylist(remaining[0] ?? "Default");
+        react("scared");
       }
       return closeOverlay();
     }
@@ -897,6 +1132,28 @@ function App({
     }
 
     if (overlay.kind === "help") return closeOverlay();
+
+    if (overlay.kind === "eq") {
+      if (key.escape || ch === "e") return closeOverlay();
+      if (key.leftArrow) return setEqBand((b) => Math.max(0, b - 1));
+      if (key.rightArrow)
+        return setEqBand((b) => Math.min(EQ_BANDS.length - 1, b + 1));
+      if (key.upArrow || key.downArrow) {
+        const next = [...eq];
+        const d = key.upArrow ? 1 : -1;
+        next[eqBand] = Math.max(-12, Math.min(12, (next[eqBand] ?? 0) + d));
+        return applyEq(next);
+      }
+      if (ch === "0") return applyEq(new Array(EQ_BANDS.length).fill(0));
+      if (ch === "p") {
+        // Cycle to the next preset by matching the current gains.
+        const i = EQ_PRESETS.findIndex(
+          (pr) => JSON.stringify(pr.gains) === JSON.stringify(eq),
+        );
+        return applyEq(EQ_PRESETS[(i + 1) % EQ_PRESETS.length]!.gains);
+      }
+      return;
+    }
 
     // Main view.
     if (ch === "q") return quit();
@@ -926,19 +1183,27 @@ function App({
         target: focus === "sidebar" ? "list" : "track",
       });
     if (ch === "o") return openOverlay({ kind: "settings" });
+    if (ch === "e") return openOverlay({ kind: "eq" });
+    if (ch === "f") {
+      setFocus("tracks");
+      setFiltering(true);
+      return;
+    }
     if (ch === "?") return openOverlay({ kind: "help" });
     if (ch === "d") {
       if (focus === "sidebar" && playlists[sideIdx]) {
         return openOverlay({ kind: "confirmPlaylist", name: playlists[sideIdx]! });
       }
-      if (tracks[listIdx]) return openOverlay({ kind: "confirmTrack", index: listIdx });
+      if (viewIdx[listIdx] != null)
+        return openOverlay({ kind: "confirmTrack", index: viewIdx[listIdx]! });
       return;
     }
 
     if (focus === "tracks") {
       if (key.upArrow) return setListIdx((i) => Math.max(0, i - 1));
-      if (key.downArrow) return setListIdx((i) => Math.min(tracks.length - 1, i + 1));
-      if (key.return) return play(listIdx);
+      if (key.downArrow)
+        return setListIdx((i) => Math.min(viewIdx.length - 1, i + 1));
+      if (key.return && viewIdx[listIdx] != null) return play(viewIdx[listIdx]!);
       return;
     }
     if (key.upArrow) return setSideIdx((i) => Math.max(0, i - 1));
@@ -1029,6 +1294,61 @@ function App({
   }
 
   // --- render overlays ---
+  if (overlay.kind === "eq") {
+    const H = 9; // slider rows; middle row = 0 dB
+    const g = eq[eqBand] ?? 0;
+    const preset =
+      EQ_PRESETS.find((p) => JSON.stringify(p.gains) === JSON.stringify(eq))
+        ?.name ?? "Custom";
+    const knobRow = (b: number) =>
+      Math.round(((12 - (eq[b] ?? 0)) / 24) * (H - 1));
+    return (
+      <Modal
+        title="Equalizer"
+        cols={cols}
+        rows={rows}
+        width={Math.min(cols - 4, 52)}
+      >
+        <Text>
+          {EQ_LABELS[eqBand]}Hz{"  "}
+          <Text color={accent}>
+            {g > 0 ? "+" : ""}
+            {g} dB
+          </Text>
+          {"   ·   "}
+          <Text color={accent}>{preset}</Text>
+        </Text>
+        <Box marginTop={1}>
+          {EQ_BANDS.map((_, b) => (
+            <Box key={b} flexDirection="column" alignItems="center" marginRight={1}>
+              {Array.from({ length: H }, (_, r) => {
+                const knob = r === knobRow(b);
+                const zero = r === Math.floor(H / 2);
+                return (
+                  <Text
+                    key={r}
+                    color={b === eqBand ? accent : undefined}
+                    dimColor={b !== eqBand && !knob}
+                  >
+                    {knob ? "███" : zero ? " ─ " : "   "}
+                  </Text>
+                );
+              })}
+              <Text
+                color={b === eqBand ? accent : undefined}
+                dimColor={b !== eqBand}
+              >
+                {(EQ_LABELS[b] ?? "").padStart(3)}
+              </Text>
+            </Box>
+          ))}
+        </Box>
+        <Box marginTop={1}>
+          <Text dimColor>←→ band · ↑↓ ±dB · 0 reset · p preset · esc close</Text>
+        </Box>
+      </Modal>
+    );
+  }
   if (overlay.kind !== "none") {
     const ov = renderOverlay(overlay, sel, input, cols, rows, playlists, frame);
     if (ov) return ov;
@@ -1053,10 +1373,11 @@ function App({
     );
   };
   const trackW = Math.max(20, cols - SIDEBAR_W - 9);
-  const renderTrack = (i: number, hl: boolean) => {
-    const tr = tracks[i];
+  const renderTrack = (displayI: number, hl: boolean) => {
+    const real = viewIdx[displayI]!;
+    const tr = tracks[real];
     if (!tr) return null;
-    const prefix = i === current ? "▶ " : hl ? "› " : "  ";
+    const prefix = real === current ? "▶ " : hl ? "› " : "  ";
     const durStr = tr.duration ? fmtTime(tr.duration) : "";
     const room = trackW - prefix.length - (durStr ? durStr.length + 1 : 0);
     const name = tr.title.slice(0, room).padEnd(room);
@@ -1065,7 +1386,7 @@ function App({
       <Text
         color={hl ? "black" : accent}
         backgroundColor={hl ? accent : undefined}
-        bold={i === current}
+        bold={real === current}
         dimColor={!tr.resolved && !hl}
       >
         {line}
@@ -1074,6 +1395,7 @@ function App({
   };
 
   const clock = new Date().toTimeString().slice(0, 5);
+  const reaction = frame < reactRef.current.until ? reactRef.current.type : null;
 
   return (
     <Box flexDirection="column" width={cols} height={rows}>
@@ -1088,6 +1410,7 @@ function App({
       <NowPlaying
         state={state}
         spec={spec}
+        peaks={peaks}
         wave={wave}
         frame={frame}
         mode={mode}
@@ -1096,6 +1419,7 @@ function App({
         repeat={repeat}
         width={cols - 2}
         artist={current >= 0 ? tracks[current]?.artist : undefined}
+        reaction={reaction}
       />
       <Box flexGrow={1}>
         <Panel
@@ -1108,8 +1432,12 @@ function App({
           width={SIDEBAR_W}
         />
         <Panel
-          title={t("ui.playlist", { n: tracks.length }).trim()}
-          count={tracks.length}
+          title={
+            filtering || filt
+              ? `filter: ${filter}${filtering ? "▌" : ""}  (${viewIdx.length})`
+              : t("ui.playlist", { n: tracks.length }).trim()
+          }
+          count={viewIdx.length}
           selected={listIdx}
           focused={focus === "tracks"}
           maxVisible={panelMax}
@@ -1120,8 +1448,8 @@ function App({
       </Box>
       <Box paddingX={1}>
         <Text color={accent} dimColor>
-          ↑↓ · ↵ play · space · n/p · s/r · v viz ({mode}) · / search · a add ·
-          d del · o settings · ? help · q quit
+          ↑↓ · ↵ play · space · n/p · s/r · v viz ({mode}) · e eq · / search ·
+          f filter · a add · d del · o settings · ? help · q quit
         </Text>
       </Box>
     </Box>
@@ -1251,9 +1579,9 @@ function renderOverlay(
       <Modal title={t("ui.helpLabel").trim()} cols={cols} rows={rows}>
         <Text>
           ↑↓ navigate · ↵ play · space pause · ←→ seek{"\n"}
-          n/p next/prev · s shuffle · r repeat{"\n"}
-          / search · a add · d delete · o settings{"\n"}
-          +/- volume · m mute · Tab panel · ? help · q quit
+          n/p next/prev · s shuffle · r repeat · v visualizer{"\n"}
+          e equalizer · f filter · / search · a add · d delete{"\n"}
+          o settings · +/- volume · m mute · Tab panel · ? help · q quit
         </Text>
         <Box marginTop={1}>
           <Text dimColor>esc to close</Text>

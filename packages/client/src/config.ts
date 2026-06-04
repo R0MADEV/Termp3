@@ -115,6 +115,7 @@ export interface Settings {
   activePlaylist?: string;
   theme?: string;
   vizMode?: string;
+  eqGains?: number[]; // 10-band equalizer (dB per band)
   // Resume: last track + position within the last playlist.
   lastPlaylist?: string;
   lastUrl?: string;
