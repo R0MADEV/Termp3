@@ -6,6 +6,7 @@
 // Synchronized rooms (optional WebSocket mode) come later,
 // as a layer on top of this same core.
 
+import { execFile } from "node:child_process";
 import { checkMpv, checkYtDlp, installHint } from "./deps.ts";
 import { Player } from "./player.ts";
 import { loadPlaylist, addUrl } from "./playlist.ts";
@@ -14,7 +15,7 @@ import { runInkUI, controlBus } from "./ui/ink/app.tsx";
 import { AudioAnalyzer } from "./audio.ts";
 import { startTitleBroadcast } from "./title.ts";
 import { startStatusBroadcast, readStatus } from "./status.ts";
-import { startControlServer, sendControl } from "./control.ts";
+import { startControlServer, sendControl, isInstanceRunning } from "./control.ts";
 import {
   ensureYtDlp,
   findYtDlp,
@@ -28,6 +29,40 @@ import { t, setLocale, SUPPORTED_LOCALES, type Locale } from "./i18n.ts";
 async function ensureYtDlpForTracks(tracks: { url: string }[]): Promise<void> {
   const hasRemote = tracks.some((t) => /^https?:\/\//i.test(t.url));
   if (hasRemote) await ensureYtDlp((m) => console.log(m));
+}
+
+/**
+ * Panic button: kills any mpv that catunes started, even orphans left behind by
+ * a hard-closed terminal or a crash. We match the unique "catunes-mpv" IPC
+ * socket name so other mpv instances the user runs are never touched.
+ */
+function stopStrayPlayers(): Promise<number> {
+  return new Promise((resolve) => {
+    if (process.platform === "win32") {
+      const cmd =
+        "Get-CimInstance Win32_Process -Filter \"Name='mpv.exe'\" | " +
+        "Where-Object { $_.CommandLine -like '*catunes-mpv*' } | " +
+        "ForEach-Object { Stop-Process -Id $_.ProcessId -Force }";
+      execFile("powershell", ["-NoProfile", "-Command", cmd], () => resolve(-1));
+      return;
+    }
+    execFile("ps", ["-A", "-o", "pid=,command="], (err, out) => {
+      if (err || !out) return resolve(0);
+      let killed = 0;
+      for (const line of out.split("\n")) {
+        if (!line.includes("catunes-mpv")) continue;
+        const pid = Number(line.trim().split(/\s+/)[0]);
+        if (!pid) continue;
+        try {
+          process.kill(pid, "SIGKILL");
+          killed++;
+        } catch {
+          // already gone
+        }
+      }
+      resolve(killed);
+    });
+  });
 }
 
 const VERSION = "0.1.1";
@@ -49,6 +84,12 @@ function help() {
 }
 
 async function launchUI() {
+  // Only one player at a time: a second window would fight over the control
+  // socket and stack up audio. Tell the user to close the other one first.
+  if (await isInstanceRunning()) {
+    console.error(t("err.alreadyRunning"));
+    process.exit(1);
+  }
   const mpv = checkMpv();
   if (!mpv.found) {
     console.error(t("err.mpvMissing", { hint: installHint("mpv") }));
@@ -234,6 +275,13 @@ switch (cmd) {
     // Prints the "now playing" (for tmux/zellij bars). Empty if nothing is playing.
     console.log(readStatus());
     break;
+  case "off":
+  case "stop": {
+    // Panic button: stop all catunes playback, including orphaned mpv.
+    const n = await stopStrayPlayers();
+    console.log(n === 0 ? t("off.none") : t("off.done", { n: String(n) }));
+    break;
+  }
   case "config": {
     const s = loadSettings();
     if (!arg) {

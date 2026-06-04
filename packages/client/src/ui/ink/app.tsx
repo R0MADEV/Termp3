@@ -209,6 +209,68 @@ function Visualizer({
   return <Box flexDirection="column">{rows}</Box>;
 }
 
+// --- Cat mascot (ᓚᘏᗢ) ---
+// Pacing cat used as a loading spinner; constant width so nothing jitters.
+const CAT_WALK = ["ᓚᘏᗢ   ", " ᓚᘏᗢ  ", "  ᓚᘏᗢ ", "   ᓚᘏᗢ", "  ᓚᘏᗢ ", " ᓚᘏᗢ  "];
+
+/** Mascot reflecting the player state; while playing the notes grow with the bass. */
+function catMascot(playing: boolean, paused: boolean, beat: number): string {
+  if (paused) return "ᓚᘏᗢ  zZ";
+  if (!playing) return "ᓚᘏᗢ";
+  const notes = (beat > 0.66 ? "♫♪♫" : beat > 0.33 ? "♪♫" : "♪").padEnd(3, " ");
+  return `ᓚᘏᗢ ${notes}`;
+}
+
+// --- Cat mascot (top-right, themed) ---
+// Block-art sitting cat with ears, face, arms and paws. Drawn in the theme
+// accent; the eyes react to the player state and the beat.
+function PixelCat({
+  mode,
+  beat,
+  frame,
+}: {
+  mode: "play" | "pause" | "stop";
+  beat: number;
+  frame: number;
+}) {
+  const accent = theme().accent;
+  // Realistic eye: a white eyeball with a dark pupil that glances around,
+  // blinks, and widens on a strong beat. Closed (a lid line) on pause/blink.
+  const closed = mode === "pause" || frame % 28 < 2;
+  const pupil =
+    mode === "play" && beat > 0.5
+      ? "●" // wide
+      : ((look) => (look === 1 ? "◗" : look === 3 ? "◖" : "●"))(
+          Math.floor(frame / 7) % 4,
+        );
+  const Eye = () =>
+    closed ? (
+      <Text color={accent}>‿</Text>
+    ) : (
+      <Text color="#1b1b1b" backgroundColor="white">
+        {pupil}
+      </Text>
+    );
+  return (
+    <Box flexDirection="column">
+      <Text color={accent}>{"        ▄▀▄       ▄▀▄"}</Text>
+      <Text color={accent}>{"       █   ▀▄▄▄▄▄▀   █"}</Text>
+      <Box>
+        <Text color={accent}>{"      █  "}</Text>
+        <Eye />
+        <Text color={accent}>{"         "}</Text>
+        <Eye />
+        <Text color={accent}>{"  █"}</Text>
+      </Box>
+      <Text color={accent}>{" ───  █       ▄       █  ───"}</Text>
+      <Text color={accent}>{" ──   █    ▀▀▀▀▀    █   ──"}</Text>
+      <Text color={accent}>{"        ▀▄▄▄▄▄▄▄▄▄▄▄▀"}</Text>
+      <Text color={accent}>{"▄▄▄▄▄▄▄▄█   █   █   █▄▄▄▄▄▄▄▄"}</Text>
+      <Text color={accent}>{"        ▀▄▄▄▀   ▀▄▄▄▀"}</Text>
+    </Box>
+  );
+}
+
 function NowPlaying({
   state,
   spec,
@@ -242,40 +304,61 @@ function NowPlaying({
         : `■  ${t("ui.state.stop")}`;
   const repIcon = repeat === "one" ? "🔂" : "🔁";
   const ratio = state.duration > 0 ? state.position / state.duration : 0;
-  const progW = Math.max(10, width - 24);
+  const progW = Math.max(10, width - 46);
+  const bass =
+    spec.length >= 3 ? (spec[0]! + spec[1]! + spec[2]!) / (3 * SPECTRUM_H) : 0;
+  const cat = loading
+    ? CAT_WALK[frame % CAT_WALK.length]!
+    : catMascot(!!state.url && !state.paused, state.paused, bass);
+  const catMode: "play" | "pause" | "stop" = state.paused
+    ? "pause"
+    : state.url
+      ? "play"
+      : "stop";
 
   return (
-    <Box borderStyle="round" borderColor={accent} flexDirection="column" paddingX={1}>
-      <Box justifyContent="space-between">
-        <Text bold color={accent}>
-          ♫ {title.slice(0, width - 22)}
-        </Text>
-        <Text>
-          <Text color={shuffle ? accent : "gray"}>🔀 </Text>
-          <Text color={repeat === "off" ? "gray" : accent}>{repIcon} </Text>
-          <Text color={loading ? "yellow" : accent}>{stateText}</Text>
-        </Text>
+    <Box borderStyle="round" borderColor={accent} flexDirection="row" paddingX={1}>
+      <Box flexDirection="column" flexGrow={1}>
+        <Box justifyContent="space-between">
+          <Text bold color={accent}>
+            ♫ {title.slice(0, width - 22)}
+          </Text>
+          <Text>
+            <Text color={shuffle ? accent : "gray"}>🔀 </Text>
+            <Text color={repeat === "off" ? "gray" : accent}>{repIcon} </Text>
+            <Text color={loading ? "yellow" : accent}>{stateText}</Text>
+            <Text color={accent}>  {cat}</Text>
+          </Text>
+        </Box>
+        <Box marginTop={1}>
+          <Visualizer
+            mode={mode}
+            spec={spec}
+            wave={wave}
+            frame={frame}
+            playing={!!state.url && !state.paused}
+          />
+        </Box>
+        <Box marginTop={1}>
+          <Text color={accent}>{bar(ratio, progW)}</Text>
+          <Text dimColor>
+            {" "}
+            {fmtTime(state.position)} / {dur}
+          </Text>
+        </Box>
+        <Box>
+          <Text>{state.volume === 0 ? "🔇" : "🔊"} </Text>
+          <Text color={accent}>{bar(state.volume / 100, 12)}</Text>
+          <Text dimColor> {state.volume}%</Text>
+        </Box>
       </Box>
-      <Box marginTop={1}>
-        <Visualizer
-          mode={mode}
-          spec={spec}
-          wave={wave}
-          frame={frame}
-          playing={!!state.url && !state.paused}
-        />
-      </Box>
-      <Box marginTop={1}>
-        <Text color={accent}>{bar(ratio, progW)}</Text>
-        <Text dimColor>
-          {" "}
-          {fmtTime(state.position)} / {dur}
-        </Text>
-      </Box>
-      <Box>
-        <Text>{state.volume === 0 ? "🔇" : "🔊"} </Text>
-        <Text color={accent}>{bar(state.volume / 100, 12)}</Text>
-        <Text dimColor> {state.volume}%</Text>
+      <Box
+        flexShrink={0}
+        marginLeft={2}
+        alignItems="center"
+        justifyContent="center"
+      >
+        <PixelCat mode={catMode} beat={bass} frame={frame} />
       </Box>
     </Box>
   );
@@ -326,17 +409,21 @@ function Panel({
   return (
     <Box
       borderStyle="round"
-      borderColor={focused ? accent : "gray"}
+      borderColor={accent}
+      borderDimColor={!focused}
       flexDirection="column"
       paddingX={1}
       width={width}
       flexGrow={flexGrow}
     >
-      <Text bold color={focused ? accent : "gray"}>
+      <Text bold color={accent} dimColor={!focused}>
         {title}
       </Text>
       {count === 0 && emptyHint ? (
-        <Text dimColor>{emptyHint}</Text>
+        <Box flexDirection="column">
+          <Text dimColor>ᓚᘏᗢ  zZ</Text>
+          <Text dimColor>{emptyHint}</Text>
+        </Box>
       ) : (
         <>
           {start > 0 && <Text dimColor> ▲ …</Text>}
@@ -894,7 +981,7 @@ function App({
 
   // --- render overlays ---
   if (overlay.kind !== "none") {
-    const ov = renderOverlay(overlay, sel, input, cols, rows, playlists);
+    const ov = renderOverlay(overlay, sel, input, cols, rows, playlists, frame);
     if (ov) return ov;
   }
 
@@ -977,6 +1064,7 @@ function renderOverlay(
   cols: number,
   rows: number,
   playlists: string[],
+  frame: number,
 ): React.ReactElement | null {
   const accent = theme().accent;
   const maxVisible = Math.max(3, rows - 9);
@@ -1080,7 +1168,9 @@ function renderOverlay(
   if (overlay.kind === "loading") {
     return (
       <Modal title="catunes" cols={cols} rows={rows}>
-        <Text color={accent}>{overlay.text}</Text>
+        <Text color={accent}>
+          {CAT_WALK[frame % CAT_WALK.length]!}  {overlay.text}
+        </Text>
       </Modal>
     );
   }

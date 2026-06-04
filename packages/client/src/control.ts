@@ -91,6 +91,23 @@ export function startControlServer(handlers: ControlHandlers): Server {
   return server;
 }
 
+/** True if another catunes instance is already listening on the control socket. */
+export function isInstanceRunning(timeoutMs = 800): Promise<boolean> {
+  return new Promise((resolve) => {
+    const sock = createConnection(CONTROL_SOCKET);
+    let done = false;
+    const finish = (running: boolean) => {
+      if (done) return;
+      done = true;
+      sock.destroy();
+      resolve(running);
+    };
+    sock.on("connect", () => finish(true));
+    sock.on("error", () => finish(false)); // no socket or stale → free to start
+    setTimeout(() => finish(false), timeoutMs);
+  });
+}
+
 /**
  * Sends a command to the running player. Returns false if there is none
  * (the socket doesn't exist or doesn't respond).

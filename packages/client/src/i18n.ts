@@ -36,6 +36,7 @@ CONTROL FROM ANY TAB (with a player running):
   catunes next           Next track
   catunes prev           Previous track
   catunes vol +5         Raise/lower volume (+5 / -5)
+  catunes off            Stop all playback (panic button)
 
 NOW PLAYING IN ANY TERMINAL:
   While catunes plays, it updates the terminal TITLE (Warp shows it in the tab
@@ -50,6 +51,8 @@ CONTROLS (interface):
   ↑↓ navigate · ↵ play · space pause · ←→ seek · n/p next/prev · +/- vol · q quit
 `,
     "err.mpvMissing": "\n❌ mpv is not installed.\n   {hint}\n",
+    "err.alreadyRunning":
+      "\n⚠️  catunes is already running in another window.\n   Close it first, or run `catunes off` to stop it.\n",
     "err.ytdlpYoutube":
       "\n⚠️  This looks like a YouTube URL and yt-dlp is not installed.\n   {hint}\n",
     "err.missingUrlPlay": "Missing URL. Usage: catunes play <url>",
@@ -73,6 +76,8 @@ CONTROLS (interface):
     "reason.duplicate": "already in the list",
     "ctl.noPlayer": "No active catunes player.",
     "vol.usage": "Usage: catunes vol +5  (or -5)",
+    "off.done": "Stopped {n} catunes player(s). 🔇",
+    "off.none": "No catunes playback was running.",
     "play.goodbye": "\n👋 see you\n",
     "deps.installFallback": "Install {dep} from its official site.",
     "ui.noSong": "— no song —",
@@ -149,6 +154,7 @@ CONTROL DESDE CUALQUIER PESTANA (con un reproductor en marcha):
   catunes next           Siguiente cancion
   catunes prev           Cancion anterior
   catunes vol +5         Sube/baja el volumen (+5 / -5)
+  catunes off            Detiene toda la reproduccion (boton de panico)
 
 AHORA SUENA EN CUALQUIER TERMINAL:
   Mientras catunes reproduce, actualiza el TITULO del terminal (Warp lo muestra
@@ -163,6 +169,8 @@ CONTROLES (interfaz):
   ↑↓ navegar · ↵ play · espacio pausa · ←→ seek · n/p sig/ant · +/- vol · q salir
 `,
     "err.mpvMissing": "\n❌ mpv no esta instalado.\n   {hint}\n",
+    "err.alreadyRunning":
+      "\n⚠️  catunes ya esta abierto en otra ventana.\n   Cierralo primero, o usa `catunes off` para detenerlo.\n",
     "err.ytdlpYoutube":
       "\n⚠️  Esta URL parece de YouTube y yt-dlp no esta instalado.\n   {hint}\n",
     "err.missingUrlPlay": "Falta la URL. Uso: catunes play <url>",
@@ -186,6 +194,8 @@ CONTROLES (interfaz):
     "reason.duplicate": "ya estaba en la lista",
     "ctl.noPlayer": "No hay un reproductor catunes activo.",
     "vol.usage": "Uso: catunes vol +5  (o -5)",
+    "off.done": "Detenidos {n} reproductor(es) de catunes. 🔇",
+    "off.none": "No había reproducción de catunes en marcha.",
     "play.goodbye": "\n👋 hasta luego\n",
     "deps.installFallback": "Instala {dep} desde su web oficial.",
     "ui.noSong": "— sin cancion —",
