@@ -28,6 +28,21 @@ export interface Track {
   url: string;
   title: string;
   resolved: boolean; // true if the title is the real one (not a placeholder)
+  duration?: number; // seconds, when known
+  artist?: string; // uploader/channel, when known
+}
+
+// Cache entries used to be plain title strings; now they hold duration + artist
+// too. We still read the legacy string form for backward compatibility.
+type CacheEntry = string | { title: string; duration?: number; artist?: string };
+function entryTitle(e: CacheEntry | undefined): string | undefined {
+  return typeof e === "string" ? e : e?.title;
+}
+function entryDuration(e: CacheEntry | undefined): number | undefined {
+  return typeof e === "string" ? undefined : e?.duration;
+}
+function entryArtist(e: CacheEntry | undefined): string | undefined {
+  return typeof e === "string" ? undefined : e?.artist;
 }
 
 export interface SearchResult {
@@ -118,17 +133,28 @@ export async function fetchPlaylist(
   return { name, entries: parseEntries(out) };
 }
 
-/** Fetches a single URL's title (no download). */
-async function fetchTitle(url: string): Promise<string | null> {
+/** Fetches a single URL's title, duration and artist (no download). */
+async function fetchMeta(
+  url: string,
+): Promise<{ title: string; duration: number; artist?: string } | null> {
   const out = await ytDlpStdout([
     "--no-warnings",
     "--no-playlist",
     "--skip-download",
     "-O",
-    "%(title)s",
+    "%(title)s\n%(duration)s\n%(uploader)s",
     url,
   ]);
-  return out.split(/\r?\n/)[0]?.trim() || null;
+  const [title, durRaw, uploader] = out.split(/\r?\n/);
+  const t = title?.trim();
+  if (!t) return null;
+  const d = Number(durRaw?.trim());
+  const a = uploader?.trim();
+  return {
+    title: t,
+    duration: Number.isFinite(d) && d > 0 ? d : 0,
+    artist: a && a !== "NA" ? a : undefined,
+  };
 }
 
 // --- named playlist files ---
@@ -196,10 +222,17 @@ function isLocalFile(url: string): boolean {
   return !/^(https?|rtmp|rtsp):\/\//i.test(url);
 }
 
-function toTrack(url: string, cache: Record<string, string>): Track {
+function toTrack(url: string, cache: Record<string, CacheEntry>): Track {
   if (isLocalFile(url)) return { url, title: basename(url), resolved: true };
-  const cached = cache[url];
-  if (cached) return { url, title: cached, resolved: true };
+  const title = entryTitle(cache[url]);
+  if (title)
+    return {
+      url,
+      title,
+      resolved: true,
+      duration: entryDuration(cache[url]),
+      artist: entryArtist(cache[url]),
+    };
   return { url, title: url, resolved: false };
 }
 
@@ -244,7 +277,7 @@ export function removeUrl(url: string): boolean {
 
 // --- title cache ---
 
-function loadCache(): Record<string, string> {
+function loadCache(): Record<string, CacheEntry> {
   if (!existsSync(TITLES_CACHE)) return {};
   try {
     return JSON.parse(readFileSync(TITLES_CACHE, "utf8"));
@@ -253,8 +286,37 @@ function loadCache(): Record<string, string> {
   }
 }
 
-function saveCache(cache: Record<string, string>): void {
+function saveCache(cache: Record<string, CacheEntry>): void {
   writeFileSync(TITLES_CACHE, JSON.stringify(cache, null, 2));
+}
+
+/**
+ * Drops cache entries for URLs that are no longer in ANY playlist, so the cache
+ * can't grow forever. Safe: a URL still present in some playlist is kept, so
+ * re-adding a removed track elsewhere still resolves instantly.
+ */
+export function pruneTitleCache(): void {
+  ensureConfig();
+  const cache = loadCache();
+  const urls = Object.keys(cache);
+  if (urls.length === 0) return;
+  const used = new Set<string>();
+  for (const name of listPlaylists()) {
+    const file = playlistFile(name);
+    if (!existsSync(file)) continue;
+    for (const line of readFileSync(file, "utf8").split(/\r?\n/)) {
+      const url = line.trim();
+      if (url && !url.startsWith("#")) used.add(url);
+    }
+  }
+  let changed = false;
+  for (const url of urls) {
+    if (!used.has(url)) {
+      delete cache[url];
+      changed = true;
+    }
+  }
+  if (changed) saveCache(cache);
 }
 
 /** Stores known titles in the cache (e.g. from an import or a search). */
@@ -277,23 +339,40 @@ export async function resolveTitlesAt(
   concurrency = 4,
 ): Promise<void> {
   const cache = loadCache();
-  const pending = indices.filter((i) => tracks[i] && !tracks[i]!.resolved);
+  // Needs work if the title, duration or artist was never fetched (legacy cache
+  // stored titles only). Local files have no remote metadata to fetch.
+  const needs = (tr: Track) =>
+    !isLocalFile(tr.url) &&
+    (!tr.resolved ||
+      entryDuration(cache[tr.url]) === undefined ||
+      entryArtist(cache[tr.url]) === undefined);
+  const pending = indices.filter((i) => tracks[i] && needs(tracks[i]!));
 
   let cursor = 0;
   const worker = async () => {
     while (cursor < pending.length) {
       const i = pending[cursor++]!;
       const tr = tracks[i];
-      if (!tr || tr.resolved) continue;
+      if (!tr) continue;
       const cached = cache[tr.url];
-      const title = cached ?? (await fetchTitle(tr.url));
-      if (!title) continue;
-      tr.title = title;
+      const cachedTitle = entryTitle(cached);
+      const cachedDur = entryDuration(cached);
+      const cachedArtist = entryArtist(cached);
+      // Reuse the cache only when title, duration AND artist are all present.
+      const complete =
+        cachedTitle && cachedDur !== undefined && cachedArtist !== undefined;
+      const meta = complete
+        ? { title: cachedTitle!, duration: cachedDur!, artist: cachedArtist! }
+        : await fetchMeta(tr.url);
+      if (!meta) continue;
+      // "" is the sentinel for "fetched, but no artist" so we never refetch it.
+      const artist = meta.artist ?? "";
+      tr.title = meta.title;
+      tr.duration = meta.duration;
+      tr.artist = artist;
       tr.resolved = true;
-      if (!cached) {
-        cache[tr.url] = title;
-        saveCache(cache);
-      }
+      cache[tr.url] = { title: meta.title, duration: meta.duration, artist };
+      saveCache(cache);
       onUpdate(i, tr);
     }
   };

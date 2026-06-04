@@ -9,7 +9,7 @@
 import { execFile } from "node:child_process";
 import { checkMpv, checkYtDlp, installHint } from "./deps.ts";
 import { Player } from "./player.ts";
-import { loadPlaylist, addUrl } from "./playlist.ts";
+import { loadPlaylist, addUrl, pruneTitleCache } from "./playlist.ts";
 import { PLAYLISTS_DIR, loadSettings, saveSettings } from "./config.ts";
 import { runInkUI, controlBus } from "./ui/ink/app.tsx";
 import { AudioAnalyzer } from "./audio.ts";
@@ -90,6 +90,8 @@ async function launchUI() {
     console.error(t("err.alreadyRunning"));
     process.exit(1);
   }
+  // Keep the title cache bounded: drop entries for tracks no longer in any list.
+  pruneTitleCache();
   const mpv = checkMpv();
   if (!mpv.found) {
     console.error(t("err.mpvMissing", { hint: installHint("mpv") }));

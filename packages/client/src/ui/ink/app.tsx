@@ -61,6 +61,14 @@ function bar(ratio: number, width: number): string {
   return "▰".repeat(filled) + "▱".repeat(width - filled);
 }
 
+/** Scrolls a string that doesn't fit (Winamp-style marquee); static if it fits. */
+function marquee(s: string, width: number, frame: number): string {
+  if (s.length <= width) return s;
+  const full = s + "   •   ";
+  const off = Math.floor(frame / 3) % full.length;
+  return (full + full).slice(off, off + width);
+}
+
 /** Strips playlist/radio params so only the single video is added. */
 function singleVideoUrl(url: string): string {
   const m = url.match(/[?&]v=([^&]+)/);
@@ -103,31 +111,47 @@ function hslToHex(h: number, s: number, l: number): string {
   return `#${f(0)}${f(8)}${f(4)}`;
 }
 
-function vizBars(spec: number[]): React.ReactNode[] {
+// Colour columns by frequency: bass (left) → treble (right) across the theme's
+// low/mid/high spectrum colours — a gradient instead of one flat colour.
+function bandColor(i: number): string {
   const [low, mid, high] = theme().spectrum;
+  return i < SPECTRUM_COLS / 3 ? low! : i < (2 * SPECTRUM_COLS) / 3 ? mid! : high!;
+}
+
+function vizBars(spec: number[]): React.ReactNode[] {
   const rows: React.ReactNode[] = [];
   for (let level = SPECTRUM_H - 1; level >= 0; level--) {
-    const color = level >= 4 ? high : level >= 2 ? mid : low;
-    let line = "";
-    for (let i = 0; i < SPECTRUM_COLS; i++) line += (spec[i] ?? 0) > level ? "█" : " ";
-    rows.push(<Text key={level} color={color}>{line}</Text>);
+    const cells: React.ReactNode[] = [];
+    for (let i = 0; i < SPECTRUM_COLS; i++)
+      cells.push(
+        <Text key={i} color={bandColor(i)}>
+          {(spec[i] ?? 0) > level ? "█" : " "}
+        </Text>,
+      );
+    rows.push(<Box key={level}>{cells}</Box>);
   }
   return rows;
 }
 
 function vizSmooth(spec: number[]): React.ReactNode[] {
-  const [low, mid, high] = theme().spectrum;
   const rows: React.ReactNode[] = [];
   for (let level = SPECTRUM_H - 1; level >= 0; level--) {
-    const color = level >= 4 ? high : level >= 2 ? mid : low;
-    let line = "";
+    const cells: React.ReactNode[] = [];
     for (let i = 0; i < SPECTRUM_COLS; i++) {
       const h = spec[i] ?? 0;
-      if (h >= level + 1) line += "█";
-      else if (h > level) line += LEVELS[Math.min(7, Math.floor((h - level) * 8))];
-      else line += " ";
+      const ch =
+        h >= level + 1
+          ? "█"
+          : h > level
+            ? LEVELS[Math.min(7, Math.floor((h - level) * 8))]
+            : " ";
+      cells.push(
+        <Text key={i} color={bandColor(i)}>
+          {ch}
+        </Text>,
+      );
     }
-    rows.push(<Text key={level} color={color}>{line}</Text>);
+    rows.push(<Box key={level}>{cells}</Box>);
   }
   return rows;
 }
@@ -251,6 +275,8 @@ function PixelCat({
         {pupil}
       </Text>
     );
+  // All rows are aligned on the same grid: the face walls (█) sit at the same
+  // columns on every row so nothing drifts. Whiskers stick out at the cheeks.
   return (
     <Box flexDirection="column">
       <Text color={accent}>{"        ▄▀▄       ▄▀▄"}</Text>
@@ -263,7 +289,7 @@ function PixelCat({
         <Text color={accent}>{"  █"}</Text>
       </Box>
       <Text color={accent}>{" ───  █       ▄       █  ───"}</Text>
-      <Text color={accent}>{" ──   █    ▀▀▀▀▀    █   ──"}</Text>
+      <Text color={accent}>{" ──    █    ▀▀▀▀▀    █   ──"}</Text>
       <Text color={accent}>{"        ▀▄▄▄▄▄▄▄▄▄▄▄▀"}</Text>
       <Text color={accent}>{"▄▄▄▄▄▄▄▄█   █   █   █▄▄▄▄▄▄▄▄"}</Text>
       <Text color={accent}>{"        ▀▄▄▄▀   ▀▄▄▄▀"}</Text>
@@ -281,6 +307,7 @@ function NowPlaying({
   shuffle,
   repeat,
   width,
+  artist,
 }: {
   state: Player["state"];
   spec: number[];
@@ -291,6 +318,7 @@ function NowPlaying({
   shuffle: boolean;
   repeat: "off" | "all" | "one";
   width: number;
+  artist?: string;
 }) {
   const accent = theme().accent;
   const dur = fmtTime(state.duration);
@@ -304,7 +332,7 @@ function NowPlaying({
         : `■  ${t("ui.state.stop")}`;
   const repIcon = repeat === "one" ? "🔂" : "🔁";
   const ratio = state.duration > 0 ? state.position / state.duration : 0;
-  const progW = Math.max(10, width - 46);
+  const progW = Math.max(10, width - 52);
   const bass =
     spec.length >= 3 ? (spec[0]! + spec[1]! + spec[2]!) / (3 * SPECTRUM_H) : 0;
   const cat = loading
@@ -320,8 +348,8 @@ function NowPlaying({
     <Box borderStyle="round" borderColor={accent} flexDirection="row" paddingX={1}>
       <Box flexDirection="column" flexGrow={1}>
         <Box justifyContent="space-between">
-          <Text bold color={accent}>
-            ♫ {title.slice(0, width - 22)}
+          <Text bold color={accent} wrap="truncate">
+            ♫ {marquee(title, Math.max(10, width - 64), frame)}
           </Text>
           <Text>
             <Text color={shuffle ? accent : "gray"}>🔀 </Text>
@@ -330,7 +358,10 @@ function NowPlaying({
             <Text color={accent}>  {cat}</Text>
           </Text>
         </Box>
-        <Box marginTop={1}>
+        <Text dimColor wrap="truncate">
+          {artist ? `  🎙 ${artist}` : " "}
+        </Text>
+        <Box>
           <Visualizer
             mode={mode}
             spec={spec}
@@ -343,7 +374,7 @@ function NowPlaying({
           <Text color={accent}>{bar(ratio, progW)}</Text>
           <Text dimColor>
             {" "}
-            {fmtTime(state.position)} / {dur}
+            {Math.round(ratio * 100)}%  {fmtTime(state.position)} / {dur}
           </Text>
         </Box>
         <Box>
@@ -386,7 +417,7 @@ function Panel({
   selected: number;
   focused: boolean;
   maxVisible: number;
-  renderItem: (index: number) => React.ReactNode;
+  renderItem: (index: number, highlighted: boolean) => React.ReactNode;
   emptyHint?: string;
   width?: number;
   flexGrow?: number;
@@ -399,13 +430,11 @@ function Panel({
       : 0;
   const rows: React.ReactNode[] = [];
   for (let i = start; i < start + max; i++) {
-    rows.push(
-      <Box key={i}>
-        <Text color={accent}>{i === selected && focused ? "› " : "  "}</Text>
-        {renderItem(i)}
-      </Box>,
-    );
+    rows.push(<Box key={i}>{renderItem(i, i === selected && focused)}</Box>);
   }
+  // Scrollbar thumb: maps the window position onto the visible rows.
+  const thumb =
+    count > max ? Math.round((start / (count - max)) * (max - 1)) : -1;
   return (
     <Box
       borderStyle="round"
@@ -425,11 +454,20 @@ function Panel({
           <Text dimColor>{emptyHint}</Text>
         </Box>
       ) : (
-        <>
-          {start > 0 && <Text dimColor> ▲ …</Text>}
-          {rows}
-          {start + max < count && <Text dimColor> ▼ …</Text>}
-        </>
+        <Box>
+          <Box flexDirection="column" flexGrow={1}>
+            {rows}
+          </Box>
+          {thumb >= 0 && (
+            <Box flexDirection="column" marginLeft={1}>
+              {Array.from({ length: max }, (_, r) => (
+                <Text key={r} color={accent} dimColor={r !== thumb}>
+                  {r === thumb ? "█" : "│"}
+                </Text>
+              ))}
+            </Box>
+          )}
+        </Box>
       )}
     </Box>
   );
@@ -713,7 +751,14 @@ function App({
     const idxs: number[] = [];
     for (let i = from; i < to; i++) {
       const tr = tracks[i];
-      if (tr && !tr.resolved && !inflight.current.has(tr.url)) {
+      if (!tr || inflight.current.has(tr.url)) continue;
+      // Resolve missing titles; also backfill duration for remote tracks that
+      // were cached (before durations existed) with the title only.
+      const wantsMeta =
+        !tr.resolved ||
+        ((tr.duration === undefined || tr.artist === undefined) &&
+          /^https?:\/\//i.test(tr.url));
+      if (wantsMeta) {
         inflight.current.add(tr.url);
         idxs.push(i);
       }
@@ -988,32 +1033,54 @@ function App({
   const loading = !!state.url && state.position === 0 && !state.paused;
 
   const active = activePlaylist();
-  const renderPlaylist = (i: number) => {
+  const renderPlaylist = (i: number, hl: boolean) => {
     const name = playlists[i] ?? "";
+    const w = SIDEBAR_W - 4;
+    const prefix = name === active ? "▶ " : hl ? "› " : "  ";
+    const text = (prefix + name).slice(0, w).padEnd(w);
     return (
-      <Text color={accent} bold={name === active}>
-        {name === active ? "▶ " : "  "}
-        {name.slice(0, SIDEBAR_W - 6)}
+      <Text
+        color={hl ? "black" : accent}
+        backgroundColor={hl ? accent : undefined}
+        bold={name === active}
+      >
+        {text}
       </Text>
     );
   };
-  const renderTrack = (i: number) => {
+  const trackW = Math.max(20, cols - SIDEBAR_W - 9);
+  const renderTrack = (i: number, hl: boolean) => {
     const tr = tracks[i];
     if (!tr) return null;
+    const prefix = i === current ? "▶ " : hl ? "› " : "  ";
+    const durStr = tr.duration ? fmtTime(tr.duration) : "";
+    const room = trackW - prefix.length - (durStr ? durStr.length + 1 : 0);
+    const name = tr.title.slice(0, room).padEnd(room);
+    const line = durStr ? `${prefix}${name} ${durStr}` : `${prefix}${name}`;
     return (
-      <Text color={accent} bold={i === current} dimColor={!tr.resolved}>
-        {i === current ? "▶ " : "  "}
-        {tr.title.slice(0, cols - SIDEBAR_W - 8)}
+      <Text
+        color={hl ? "black" : accent}
+        backgroundColor={hl ? accent : undefined}
+        bold={i === current}
+        dimColor={!tr.resolved && !hl}
+      >
+        {line}
       </Text>
     );
   };
 
+  const clock = new Date().toTimeString().slice(0, 5);
+
   return (
     <Box flexDirection="column" width={cols} height={rows}>
-      <Text bold color={accent}>
-        {" "}
-        ᓚᘏᗢ catunes
-      </Text>
+      <Box justifyContent="space-between" paddingX={1}>
+        <Text bold color={accent}>
+          ᓚᘏᗢ catunes
+        </Text>
+        <Text dimColor>
+          ♫ {tracks.length} · {clock}
+        </Text>
+      </Box>
       <NowPlaying
         state={state}
         spec={spec}
@@ -1024,6 +1091,7 @@ function App({
         shuffle={shuffle}
         repeat={repeat}
         width={cols - 2}
+        artist={current >= 0 ? tracks[current]?.artist : undefined}
       />
       <Box flexGrow={1}>
         <Panel
@@ -1047,7 +1115,7 @@ function App({
         />
       </Box>
       <Box paddingX={1}>
-        <Text dimColor>
+        <Text color={accent} dimColor>
           ↑↓ · ↵ play · space · n/p · s/r · v viz ({mode}) · / search · a add ·
           d del · o settings · ? help · q quit
         </Text>
