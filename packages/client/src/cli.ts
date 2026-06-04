@@ -30,7 +30,7 @@ async function ensureYtDlpForTracks(tracks: { url: string }[]): Promise<void> {
   if (hasRemote) await ensureYtDlp((m) => console.log(m));
 }
 
-const VERSION = "0.1.0";
+const VERSION = "0.1.1";
 
 // Apply the saved language (an explicit CATUNES_LANG env var still wins).
 {

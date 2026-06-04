@@ -487,8 +487,12 @@ function App({
     if (!tr) return;
     setCurrent(i);
     setListIdx(i);
-    player.load(tr.url);
-    analyzer.start(tr.url, 0);
+    try {
+      player.load(tr.url);
+      analyzer.start(tr.url, 0);
+    } catch {
+      // A bad URL must never crash the UI.
+    }
   };
   const pickNext = (auto: boolean): number | null => {
     const n = tracks.length;
@@ -1101,11 +1105,44 @@ function renderOverlay(
 /** Mounts the Ink UI (alternate screen, restored on exit). */
 export function runInkUI(player: Player, tracks: Track[], analyzer: AudioAnalyzer) {
   process.stdout.write("\x1b[?1049h");
+
+  // Cleanup that MUST run on every exit path — not just the `q` key. A crash,
+  // Ctrl+C or a closed terminal would otherwise leave mpv (and the analyzer's
+  // ffmpeg/yt-dlp) orphaned, playing on forever and stacking up.
+  let cleaned = false;
+  const cleanup = () => {
+    if (cleaned) return;
+    cleaned = true;
+    try {
+      analyzer.stop();
+    } catch {
+      // ignore
+    }
+    try {
+      player.quit();
+    } catch {
+      // ignore
+    }
+    process.stdout.write("\x1b[?1049l"); // restore the main screen
+  };
+  process.on("exit", cleanup);
+  for (const sig of ["SIGINT", "SIGTERM", "SIGHUP"] as const) {
+    process.on(sig, () => {
+      cleanup();
+      process.exit(0);
+    });
+  }
+  process.on("uncaughtException", (err) => {
+    cleanup();
+    console.error(err);
+    process.exit(1);
+  });
+
   const app = render(
     <App player={player} initialTracks={tracks} analyzer={analyzer} />,
   );
   app.waitUntilExit().then(() => {
-    process.stdout.write("\x1b[?1049l");
+    cleanup();
     process.exit(0);
   });
 }

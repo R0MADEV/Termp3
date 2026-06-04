@@ -142,7 +142,15 @@ export class AudioAnalyzer extends EventEmitter {
 
     const ff = spawn(ffmpegPath, args, { stdio: ["pipe", "pipe", "ignore"] });
     ff.on("error", () => {});
-    if (yt?.stdout && ff.stdin) yt.stdout.pipe(ff.stdin);
+    // Guard the streams: when we switch tracks we SIGKILL these processes
+    // mid-pipe, which raises EPIPE on stdout/stdin. Without these handlers
+    // that error is unhandled and crashes the whole UI.
+    ff.stdin?.on("error", () => {});
+    ff.stdout?.on("error", () => {});
+    if (yt?.stdout && ff.stdin) {
+      yt.stdout.on("error", () => {});
+      yt.stdout.pipe(ff.stdin);
+    }
 
     const bytesPerFrame = FFT_SIZE * 2;
     ff.stdout?.on("data", (chunk: Buffer) => {
