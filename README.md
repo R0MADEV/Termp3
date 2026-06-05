@@ -19,6 +19,11 @@ A **retro** terminal music player with **synced rooms** and
 
 - [mpv](https://mpv.io) — audio engine (required).
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) — only for YouTube and similar.
+- [gamdl](https://github.com/glomatico/gamdl) — only for Apple Music.
+
+> **Note on Apple Music:**
+> To use Apple Music, you need to provide your authentication cookies inside the UI using the command `/auth <cookies>`.
+> This project also relies on a custom fork of `applemusic-api` to fetch metadata and search the Apple catalog.
 
 Check your system with: `catunes doctor`
 

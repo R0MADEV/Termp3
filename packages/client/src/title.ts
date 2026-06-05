@@ -8,13 +8,7 @@
 //  contents, so it coexists with the UI without any issue.)
 
 import type { Player } from "./player.ts";
-
-function fmtTime(s: number): string {
-  if (!isFinite(s) || s < 0) s = 0;
-  const m = Math.floor(s / 60);
-  const sec = Math.floor(s % 60);
-  return `${m}:${sec.toString().padStart(2, "0")}`;
-}
+import { fmtTime } from "./fmt.ts";
 
 /** Sets the terminal title. */
 export function setTerminalTitle(text: string): void {
@@ -31,15 +25,23 @@ export function clearTerminalTitle(): void {
  * Returns the timer in case you want to stop it.
  */
 export function startTitleBroadcast(player: Player, intervalMs = 1000) {
+  // Only write the escape sequence when the title string actually changes.
+  let lastTitle = "";
   const update = () => {
     const s = player.state;
     if (!s.url) {
-      setTerminalTitle("catunes");
+      if (lastTitle !== "catunes") {
+        lastTitle = "catunes";
+        setTerminalTitle("catunes");
+      }
       return;
     }
     const icon = s.paused ? "⏸" : "♪";
     const title = (s.title ?? "").replace(/\s+/g, " ").slice(0, 45);
-    setTerminalTitle(`${icon} ${title}  ${fmtTime(s.position)}`);
+    const full = `${icon} ${title}  ${fmtTime(s.position)}`;
+    if (full === lastTitle) return;
+    lastTitle = full;
+    setTerminalTitle(full);
   };
 
   update();
@@ -48,3 +50,4 @@ export function startTitleBroadcast(player: Player, intervalMs = 1000) {
   process.on("exit", () => clearTerminalTitle());
   return timer;
 }
+

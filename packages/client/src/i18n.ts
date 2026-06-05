@@ -68,6 +68,8 @@ CONTROLS (interface):
     "doctor.ytDownloaded": "  ✅ yt-dlp   downloaded by catunes ({size} MB)",
     "doctor.ytAuto":
       "  ⚙️  yt-dlp   not installed — will auto-download on first use ({asset})",
+    "doctor.gamdlOk": "  ✅ gamdl    found",
+    "doctor.gamdlMissing": "  ⚠️  gamdl    not found  (only needed for Apple Music downloads)",
     "doctor.ready": "\n  Ready to play. 🎵\n",
     "doctor.needMpv": "\n  Install mpv to be able to play.\n",
     "add.ok": "✅ Added to the playlist:\n   {url}",
@@ -105,26 +107,21 @@ CONTROLS (interface):
     "ui.state.pause": "PAUSE",
     "ui.state.stop": "STOP",
     "ui.help":
-      " {a}↑↓{/} nav  {a}↵{/} play  {a}space{/} pause  {a}n/p{/} next/prev  {a}/{/} search  {a}?{/} help  {a}q{/} quit",
-    "ui.helpLabel": " Keys ",
-    "ui.helpScreen": `  {a}Tab{/}      switch panel (tracks / playlists)
-  {a}↑ ↓{/}      navigate
-  {a}Enter{/}    play selected (or open playlist)
-  {a}Space{/}    pause / resume
-  {a}← →{/}      seek 5s
-  {a}n / p{/}    next / previous
-  {a}s{/}        shuffle on/off
-  {a}r{/}        repeat (off / all / one)
-  {a}/{/}        search YouTube
-  {a}a{/}        add a URL
-  {a}d{/}        delete selected
-  {a}o{/}        settings (language, results)
-  {a}+ / -{/}    volume
-  {a}m{/}        mute
-  {a}?{/}        this help
-  {a}q{/}        quit
+      " {a}↑↓{/} nav  {a}/help{/} for commands  {a}/quit{/} exit",
+    "ui.helpLabel": " Commands ",
+    "ui.helpScreen": `  {a}/provider [youtube|apple]{/}  Switch provider
+  {a}/search <query>{/}           Search songs
+  {a}/library{/}                  Fetch Apple Music library
+  {a}/play <index>{/}             Play track by index
+  {a}/auth <cookies>{/}           Set Apple Music cookies
+  {a}/pause{/}                    Pause / resume
+  {a}/next / /prev{/}             Next / previous track
+  {a}/quit{/}                     Exit catunes
 
-  {gray-fg}Esc to close{/}`,
+  {a}↑ ↓{/}      navigate list
+  {a}Esc{/}      clear command
+
+  {gray-fg}Type commands at the bottom prompt{/}`,
     "ui.langLabel": " Language ",
     "ui.settingsLabel": " Settings ",
     "ui.optLanguage": "Language",
@@ -186,6 +183,8 @@ CONTROLES (interfaz):
     "doctor.ytDownloaded": "  ✅ yt-dlp   descargado por catunes ({size} MB)",
     "doctor.ytAuto":
       "  ⚙️  yt-dlp   no instalado — se descargará al primer uso ({asset})",
+    "doctor.gamdlOk": "  ✅ gamdl    encontrado",
+    "doctor.gamdlMissing": "  ⚠️  gamdl    no encontrado  (solo necesario para descargas de Apple Music)",
     "doctor.ready": "\n  Listo para reproducir. 🎵\n",
     "doctor.needMpv": "\n  Instala mpv para poder reproducir.\n",
     "add.ok": "✅ Anadida a la playlist:\n   {url}",
@@ -223,26 +222,21 @@ CONTROLES (interfaz):
     "ui.state.pause": "PAUSA",
     "ui.state.stop": "STOP",
     "ui.help":
-      " {a}↑↓{/} nav  {a}↵{/} play  {a}espacio{/} pausa  {a}n/p{/} sig/ant  {a}/{/} buscar  {a}?{/} ayuda  {a}q{/} salir",
-    "ui.helpLabel": " Teclas ",
-    "ui.helpScreen": `  {a}Tab{/}      cambiar panel (canciones / listas)
-  {a}↑ ↓{/}      navegar
-  {a}Enter{/}    reproducir seleccionada (o abrir lista)
-  {a}Espacio{/}  pausa / reanudar
-  {a}← →{/}      avanzar/retroceder 5s
-  {a}n / p{/}    siguiente / anterior
-  {a}s{/}        aleatorio on/off
-  {a}r{/}        repetir (off / todo / una)
-  {a}/{/}        buscar en YouTube
-  {a}a{/}        anadir una URL
-  {a}d{/}        borrar seleccionada
-  {a}o{/}        ajustes (idioma, resultados)
-  {a}+ / -{/}    volumen
-  {a}m{/}        silenciar
-  {a}?{/}        esta ayuda
-  {a}q{/}        salir
+      " {a}↑↓{/} nav  {a}/help{/} para comandos  {a}/quit{/} salir",
+    "ui.helpLabel": " Comandos ",
+    "ui.helpScreen": `  {a}/provider [youtube|apple]{/}  Cambiar proveedor
+  {a}/search <query>{/}           Buscar canciones
+  {a}/library{/}                  Cargar librería Apple Music
+  {a}/play <index>{/}             Reproducir por índice
+  {a}/auth <cookies>{/}           Configurar cookies Apple
+  {a}/pause{/}                    Pausa / reanudar
+  {a}/next / /prev{/}             Siguiente / anterior
+  {a}/quit{/}                     Salir de catunes
 
-  {gray-fg}Esc para cerrar{/}`,
+  {a}↑ ↓{/}      navegar lista
+  {a}Esc{/}      limpiar comando
+
+  {gray-fg}Escribe comandos en el prompt inferior{/}`,
     "ui.langLabel": " Idioma ",
     "ui.settingsLabel": " Ajustes ",
     "ui.optLanguage": "Idioma",
@@ -279,14 +273,51 @@ export function getLocale(): Locale {
   return current;
 }
 
+// --- Pre-compiled template cache ---
+// Each template is split once into alternating literal/placeholder parts,
+// so subsequent calls just concatenate strings (no regex, no replaceAll).
+type CompiledTemplate = { parts: string[]; slots: string[] };
+const _templateCache = new Map<string, CompiledTemplate>();
+const _PLACEHOLDER_RE = /\{([^}]+)\}/g;
+
+function _compile(template: string): CompiledTemplate {
+  const parts: string[] = [];
+  const slots: string[] = [];
+  let lastIndex = 0;
+  let m: RegExpExecArray | null;
+  _PLACEHOLDER_RE.lastIndex = 0;
+  while ((m = _PLACEHOLDER_RE.exec(template)) !== null) {
+    parts.push(template.slice(lastIndex, m.index));
+    slots.push(m[1]);
+    lastIndex = _PLACEHOLDER_RE.lastIndex;
+  }
+  parts.push(template.slice(lastIndex));
+  return { parts, slots };
+}
+
 /** Translate a key, interpolating {placeholders} from vars. */
 export function t(key: string, vars?: Record<string, string | number>): string {
   const loc = getLocale();
-  let str = MESSAGES[loc][key] ?? MESSAGES.en[key] ?? key;
-  if (vars) {
-    for (const [k, v] of Object.entries(vars)) {
-      str = str.replaceAll(`{${k}}`, String(v));
-    }
+  const raw = MESSAGES[loc][key] ?? MESSAGES.en[key] ?? key;
+
+  if (!vars) return raw;
+
+  // Cache key: locale + translation key (the raw template is always the same
+  // for a given locale+key pair, so we don't need to include the template).
+  const cacheKey = loc + "\0" + key;
+  let compiled = _templateCache.get(cacheKey);
+  if (!compiled) {
+    compiled = _compile(raw);
+    _templateCache.set(cacheKey, compiled);
   }
-  return str;
+
+  const { parts, slots } = compiled;
+  if (slots.length === 0) return raw;
+
+  let result = parts[0];
+  for (let i = 0; i < slots.length; i++) {
+    const v = vars[slots[i]];
+    result += (v !== undefined ? String(v) : `{${slots[i]}}`) + parts[i + 1];
+  }
+  return result;
 }

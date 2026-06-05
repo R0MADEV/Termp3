@@ -35,8 +35,12 @@ export function checkYtDlp(): DepStatus {
   return probe("yt-dlp");
 }
 
+export function checkGamdl(): DepStatus {
+  return probe("gamdl");
+}
+
 /** Installation instructions depending on the operating system. */
-export function installHint(dep: "mpv" | "yt-dlp"): string {
+export function installHint(dep: "mpv" | "yt-dlp" | "gamdl"): string {
   const os = platform();
   const hints: Record<string, Record<string, string>> = {
     mpv: {
@@ -48,6 +52,11 @@ export function installHint(dep: "mpv" | "yt-dlp"): string {
       darwin: "brew install yt-dlp",
       linux: "sudo apt install yt-dlp   (o: pipx install yt-dlp)",
       win32: "winget install yt-dlp   (o: choco install yt-dlp)",
+    },
+    gamdl: {
+      darwin: "pipx install gamdl   (o: pip install gamdl)",
+      linux: "pipx install gamdl   (o: pip install gamdl)",
+      win32: "pip install gamdl",
     },
   };
   return hints[dep]?.[os] ?? t("deps.installFallback", { dep });

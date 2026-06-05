@@ -48,6 +48,8 @@ function entryArtist(e: CacheEntry | undefined): string | undefined {
 export interface SearchResult {
   url: string;
   title: string;
+  duration?: number;
+  artist?: string;
 }
 
 // --- yt-dlp (shared) ---
@@ -64,17 +66,18 @@ function ytDlpStdout(args: string[]): Promise<string> {
 }
 
 /** Parses yt-dlp "%(id)s\t%(title)s" lines into results. */
+const YT_URL_PREFIX = "https://www.youtube.com/watch?v=";
 function parseEntries(stdout: string): SearchResult[] {
-  return stdout
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter(Boolean)
-    .map((line) => {
-      const tab = line.indexOf("\t");
-      const id = tab >= 0 ? line.slice(0, tab) : line;
-      const title = tab >= 0 ? line.slice(tab + 1) : id;
-      return { url: `https://www.youtube.com/watch?v=${id}`, title };
-    });
+  const results: SearchResult[] = [];
+  for (const raw of stdout.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line) continue;
+    const tab = line.indexOf("\t");
+    const id = tab >= 0 ? line.slice(0, tab) : line;
+    const title = tab >= 0 ? line.slice(tab + 1) : id;
+    results.push({ url: YT_URL_PREFIX + id, title });
+  }
+  return results;
 }
 
 /** Searches YouTube and returns results (flat, no download). */
@@ -239,11 +242,12 @@ function toTrack(url: string, cache: Record<string, CacheEntry>): Track {
 /** Reads the active playlist → tracks with provisional titles. */
 export function loadPlaylist(): Track[] {
   const cache = loadCache();
-  return readFileSync(activeFile(), "utf8")
-    .split(/\r?\n/)
-    .map((l) => l.trim())
-    .filter((url) => url && !url.startsWith("#"))
-    .map((url) => toTrack(url, cache));
+  const tracks: Track[] = [];
+  for (const raw of readFileSync(activeFile(), "utf8").split(/\r?\n/)) {
+    const url = raw.trim();
+    if (url && !url.startsWith("#")) tracks.push(toTrack(url, cache));
+  }
+  return tracks;
 }
 
 /**
@@ -256,10 +260,11 @@ export function addUrl(
   const clean = url.trim();
   if (!clean) return { added: false, reason: "empty" };
   const file = activeFile();
-  const existing = readFileSync(file, "utf8")
-    .split(/\r?\n/)
-    .map((l) => l.trim());
-  if (existing.includes(clean)) return { added: false, reason: "duplicate" };
+  const existing = new Set<string>();
+  for (const raw of readFileSync(file, "utf8").split(/\r?\n/)) {
+    existing.add(raw.trim());
+  }
+  if (existing.has(clean)) return { added: false, reason: "duplicate" };
   appendFileSync(file, `${clean}\n`);
   return { added: true };
 }
@@ -277,17 +282,23 @@ export function removeUrl(url: string): boolean {
 
 // --- title cache ---
 
+// In-memory cache: avoids re-reading and re-parsing the JSON file on every
+// call to loadCache(). Invalidated whenever saveCache() writes a new version.
+let _cachedTitles: Record<string, CacheEntry> | null = null;
+
 function loadCache(): Record<string, CacheEntry> {
-  if (!existsSync(TITLES_CACHE)) return {};
+  if (_cachedTitles) return _cachedTitles;
+  if (!existsSync(TITLES_CACHE)) return (_cachedTitles = {});
   try {
-    return JSON.parse(readFileSync(TITLES_CACHE, "utf8"));
+    return (_cachedTitles = JSON.parse(readFileSync(TITLES_CACHE, "utf8")));
   } catch {
-    return {};
+    return (_cachedTitles = {});
   }
 }
 
 function saveCache(cache: Record<string, CacheEntry>): void {
-  writeFileSync(TITLES_CACHE, JSON.stringify(cache, null, 2));
+  _cachedTitles = cache;
+  writeFileSync(TITLES_CACHE, JSON.stringify(cache));
 }
 
 /**
@@ -372,11 +383,12 @@ export async function resolveTitlesAt(
       tr.artist = artist;
       tr.resolved = true;
       cache[tr.url] = { title: meta.title, duration: meta.duration, artist };
-      saveCache(cache);
       onUpdate(i, tr);
     }
   };
   await Promise.all(
     Array.from({ length: Math.min(concurrency, pending.length) }, worker),
   );
+  // Save once at the end instead of after every individual track resolve.
+  if (pending.length > 0) saveCache(cache);
 }

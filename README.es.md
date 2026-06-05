@@ -19,6 +19,11 @@ y **rotación de DJ por turnos** — escuchad juntos, desde la terminal.
 
 - [mpv](https://mpv.io) — motor de audio (obligatorio).
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) — solo para YouTube y similares.
+- [gamdl](https://github.com/glomatico/gamdl) — solo para Apple Music.
+
+> **Nota sobre Apple Music:**
+> Para reproducir desde Apple Music necesitas proveer tus cookies de autenticación dentro de la interfaz usando el comando `/auth <cookies>`.
+> Este proyecto también utiliza un fork personalizado de `applemusic-api` para las búsquedas y resolución de catálogos.
 
 Comprueba tu sistema con: `catunes doctor`
 
