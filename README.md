@@ -9,7 +9,7 @@ A **retro** terminal music player with **synced rooms** and
 
 - 🎧 **Solo mode:** play YouTube, radios, streams or local files. Works without a server, even offline (local files).
 - 👥 **Room mode (optional):** join a room with a code and listen together, in sync. Everyone takes **turns** as DJ (round-robin).
-- 🚫 **No downloads:** pure streaming. No Spotify Premium needed.
+- 🌐 **Flexible sources:** pure streaming for YouTube and Radios (no Spotify Premium needed). Apple Music support is also available (requires an active subscription).
 - 📊 **Real audio-reactive visualizer:** live FFT (auto-installed ffmpeg) with several modes — bars, mirror, smooth, oscilloscope, plasma (cycle with `v`).
 - 🖥️ **Cross-platform:** macOS, Linux and Windows.
 
@@ -33,10 +33,25 @@ Check your system with: `catunes doctor`
 
 ```bash
 npm install -g catunes
-catunes play "https://www.youtube.com/watch?v=..."
+catunes       # Opens the full terminal UI
 ```
 
-Controls: `space` pause · `← →` seek · `+ -` volume · `q` quit.
+### Full TUI Controls
+Navigate the interface with the keyboard:
+- `Tab` / `↑ ↓` to switch panels and scroll.
+- `Enter` to play the selected track.
+- Use slash commands at the bottom prompt:
+  - `/search <query>` to find music.
+  - `/pause`, `/next`, `/prev` to control playback.
+  - `/auth <cookies>` to set Apple Music cookies.
+  - `/help` to see all commands.
+
+### Play a single track (CLI Mode)
+If you don't want the full interface, you can play a stream directly:
+```bash
+catunes play "https://www.youtube.com/watch?v=..."
+```
+Controls in CLI mode: `space` pause · `← →` seek · `+ -` volume · `q` quit.
 
 ---
 
@@ -117,13 +132,11 @@ catunes/
 
 ## Disclaimer
 
-catunes does **not** download, store or convert music — it only plays streams.
-Use it only with content you have the right to play, and respect each
-platform's terms of service. How you use it is your responsibility.
+catunes is merely a **terminal UI and player wrapper** around third-party tools (`mpv`, `yt-dlp`, `gamdl`). It does not host, distribute, or provide access to any copyrighted material by itself.
 
-It relies on mpv and yt-dlp to read media; respect copyright and the terms of
-each site (as yt-dlp itself advises). This project is not designed to download
-music or to circumvent any protection.
+Depending on the source (e.g., Apple Music), third-party tools like `gamdl` may download temporary files locally to allow playback. You must only use this software with your own legitimate accounts and credentials, for personal use, and in compliance with the terms of service of the respective platforms. How you use it is your sole responsibility.
+
+This project respects copyright. It is not designed to promote piracy or the unauthorized distribution of copyrighted music.
 
 ## License
 
