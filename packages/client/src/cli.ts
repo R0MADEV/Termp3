@@ -24,6 +24,8 @@ import {
   assetForPlatform,
 } from "./ytdlp.ts";
 import { t, setLocale, SUPPORTED_LOCALES, type Locale } from "./i18n.ts";
+import { fmtTime } from "./fmt.ts";
+import { checkGamdl } from "./gamdl.ts";
 
 /** Ensures yt-dlp is available if the playlist has any remote (streamed) URL. */
 async function ensureYtDlpForTracks(tracks: { url: string }[]): Promise<void> {
@@ -124,6 +126,7 @@ async function launchUI() {
 function doctor() {
   const mpv = checkMpv();
   const yt = checkYtDlp();
+  const gamdl = checkGamdl();
   console.log(t("doctor.header"));
 
   console.log(
@@ -138,15 +141,15 @@ function doctor() {
         ? t("doctor.ytDownloaded", { size: downloadedSizeMB() })
         : t("doctor.ytAuto", { asset: assetForPlatform().asset }),
   );
+  console.log(
+    gamdl.found
+      ? t("doctor.gamdlOk")
+      : t("doctor.gamdlMissing"),
+  );
   console.log(mpv.found ? t("doctor.ready") : t("doctor.needMpv"));
 }
 
-function fmtTime(s: number): string {
-  if (!isFinite(s) || s < 0) s = 0;
-  const m = Math.floor(s / 60);
-  const sec = Math.floor(s % 60);
-  return `${m}:${sec.toString().padStart(2, "0")}`;
-}
+
 
 function progressBar(pos: number, dur: number, width = 30): string {
   const ratio = dur > 0 ? Math.min(1, pos / dur) : 0;

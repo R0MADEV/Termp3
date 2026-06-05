@@ -18,6 +18,9 @@ interface Member {
 interface Room {
   code: string;
   members: Map<string, Member>;
+  /** Cached roster array — invalidated on join/leave via _rosterDirty flag. */
+  _rosterCache: { id: string; name: string }[];
+  _rosterDirty: boolean;
 }
 
 const rooms = new Map<string, Room>();
@@ -28,6 +31,12 @@ type Incoming =
   | { type: "pause"; paused: boolean }
   | { type: "chat"; text: string };
 
+// Reusable roster payload object — avoids a new object literal per broadcast.
+const _rosterPayload: { type: "roster"; members: { id: string; name: string }[] } = {
+  type: "roster",
+  members: [],
+};
+
 function broadcast(room: Room, payload: unknown, exceptId?: string) {
   const data = JSON.stringify(payload);
   for (const m of room.members.values()) {
@@ -35,8 +44,27 @@ function broadcast(room: Room, payload: unknown, exceptId?: string) {
   }
 }
 
-function roster(room: Room) {
-  return [...room.members.values()].map((m) => ({ id: m.id, name: m.name }));
+/** Returns the cached roster array, rebuilding only when members changed. */
+function roster(room: Room): { id: string; name: string }[] {
+  if (room._rosterDirty) {
+    const arr: { id: string; name: string }[] = [];
+    for (const m of room.members.values()) {
+      arr.push({ id: m.id, name: m.name });
+    }
+    room._rosterCache = arr;
+    room._rosterDirty = false;
+  }
+  return room._rosterCache;
+}
+
+/** Broadcasts the roster using the shared payload object. */
+function broadcastRoster(room: Room) {
+  _rosterPayload.members = roster(room);
+  broadcast(room, _rosterPayload);
+}
+
+function createRoom(code: string): Room {
+  return { code, members: new Map(), _rosterCache: [], _rosterDirty: true };
 }
 
 const server = Bun.serve<{ id: string; room?: string }, {}>({
@@ -51,7 +79,9 @@ const server = Bun.serve<{ id: string; room?: string }, {}>({
   },
   websocket: {
     open(ws) {
-      ws.send(JSON.stringify({ type: "hello", id: ws.data.id }));
+      // Pre-build hello JSON via string concat — avoids allocating an object
+      // just to stringify it immediately.
+      ws.send('{"type":"hello","id":"' + ws.data.id + '"}');
     },
     message(ws, raw) {
       let msg: Incoming;
@@ -64,12 +94,13 @@ const server = Bun.serve<{ id: string; room?: string }, {}>({
       if (msg.type === "join") {
         let room = rooms.get(msg.room);
         if (!room) {
-          room = { code: msg.room, members: new Map() };
+          room = createRoom(msg.room);
           rooms.set(msg.room, room);
         }
         room.members.set(ws.data.id, { id: ws.data.id, name: msg.name, ws });
         ws.data.room = msg.room;
-        broadcast(room, { type: "roster", members: roster(room) });
+        room._rosterDirty = true;
+        broadcastRoster(room);
         return;
       }
 
@@ -94,7 +125,10 @@ const server = Bun.serve<{ id: string; room?: string }, {}>({
       if (!room) return;
       room.members.delete(ws.data.id);
       if (room.members.size === 0) rooms.delete(room.code);
-      else broadcast(room, { type: "roster", members: roster(room) });
+      else {
+        room._rosterDirty = true;
+        broadcastRoster(room);
+      }
     },
   },
 });

@@ -9,7 +9,7 @@ y **rotación de DJ por turnos** — escuchad juntos, desde la terminal.
 
 - 🎧 **Modo solo:** reproduce YouTube, radios, streams o archivos locales. Funciona sin servidor, incluso offline (archivos locales).
 - 👥 **Modo sala (opcional):** entra a una sala con un código y escuchad lo mismo, sincronizado. Cada persona pincha **por turnos** (rotación en bucle).
-- 🚫 **Sin descargar nada:** streaming puro. Sin Spotify Premium.
+- 🌐 **Fuentes flexibles:** streaming puro para YouTube y Radios (sin necesidad de cuentas Premium). También soporta Apple Music (requiere una suscripción activa).
 - 📊 **Visualizador reactivo real:** FFT en vivo (ffmpeg auto-instalado) con varios modos — barras, espejo, suave, osciloscopio, plasma (cambia con `v`).
 - 🖥️ **Multiplataforma:** macOS, Linux y Windows.
 
@@ -19,6 +19,11 @@ y **rotación de DJ por turnos** — escuchad juntos, desde la terminal.
 
 - [mpv](https://mpv.io) — motor de audio (obligatorio).
 - [yt-dlp](https://github.com/yt-dlp/yt-dlp) — solo para YouTube y similares.
+- [gamdl](https://github.com/glomatico/gamdl) — solo para Apple Music.
+
+> **Nota sobre Apple Music:**
+> Para reproducir desde Apple Music necesitas proveer tus cookies de autenticación dentro de la interfaz usando el comando `/auth <cookies>`.
+> Este proyecto también utiliza un fork personalizado de `applemusic-api` para las búsquedas y resolución de catálogos.
 
 Comprueba tu sistema con: `catunes doctor`
 
@@ -28,10 +33,25 @@ Comprueba tu sistema con: `catunes doctor`
 
 ```bash
 npm install -g catunes
-catunes play "https://www.youtube.com/watch?v=..."
+catunes       # Abre la interfaz completa (TUI)
 ```
 
-Controles: `espacio` pausa · `← →` seek · `+ -` volumen · `q` salir.
+### Controles de la Interfaz
+Navega usando el teclado:
+- `Tab` / `↑ ↓` para cambiar de panel y moverte.
+- `Enter` para reproducir la canción seleccionada.
+- Usa los comandos con barra (`/`) en el prompt inferior:
+  - `/search <query>` para buscar música.
+  - `/pause`, `/next`, `/prev` para controlar la reproducción.
+  - `/auth <cookies>` para configurar las cookies de Apple Music.
+  - `/help` para ver todos los comandos.
+
+### Reproducir una canción suelta (Modo CLI)
+Si no quieres usar la interfaz completa, puedes reproducir un stream directamente:
+```bash
+catunes play "https://www.youtube.com/watch?v=..."
+```
+Controles en modo CLI: `espacio` pausa · `← →` seek · `+ -` volumen · `q` salir.
 
 ---
 
@@ -112,13 +132,11 @@ catunes/
 
 ## Aviso legal
 
-catunes **no** almacena ni convierte música — solo reproduce streams.
-Úsalo únicamente con contenido que tengas derecho a reproducir y respetando
-los términos de cada plataforma. El uso es responsabilidad de cada usuario.
+catunes es únicamente una **interfaz de terminal y wrapper** de herramientas de terceros (`mpv`, `yt-dlp`, `gamdl`). No aloja, distribuye ni provee acceso a material protegido por derechos de autor por sí mismo.
 
-Usa mpv y yt-dlp para leer el contenido; respeta el copyright y los términos de
-cada sitio (como advierte el propio yt-dlp). Este proyecto no está diseñado para
-descargar música ni para saltarse ninguna protección.
+Dependiendo de la fuente (ej. Apple Music), herramientas como `gamdl` pueden descargar archivos temporales localmente para permitir la reproducción. Debes usar este software únicamente con tus propias cuentas y credenciales legítimas, para uso personal, y respetando los términos de servicio de cada plataforma. El uso que le des es tu entera responsabilidad.
+
+Este proyecto respeta el copyright. No está diseñado para promover la piratería ni la distribución no autorizada de música protegida.
 
 ## Licencia
 

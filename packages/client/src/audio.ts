@@ -16,15 +16,30 @@ const FFT_SIZE = 1024;
 export const BANDS = 36;
 export const WAVE_POINTS = 64;
 
-/** Downsamples a PCM frame to a normalized waveform (-1..1) for the scope. */
-function waveFrom(buf: Buffer): number[] {
-  const wave: number[] = [];
-  for (let i = 0; i < WAVE_POINTS; i++) {
-    const idx = Math.floor((i / WAVE_POINTS) * FFT_SIZE);
-    wave.push(buf.readInt16LE(idx * 2) / 32768);
-  }
-  return wave;
+// ---------------------------------------------------------------------------
+// Pre-allocated buffers reused every frame (zero per-frame allocations).
+// ---------------------------------------------------------------------------
+
+/** Reusable FFT real-part buffer. */
+const _re = new Float64Array(FFT_SIZE);
+/** Reusable FFT imaginary-part buffer. */
+const _im = new Float64Array(FFT_SIZE);
+
+/** Pre-allocated output array for band levels (length = BANDS). */
+const _bands: number[] = new Array<number>(BANDS);
+for (let i = 0; i < BANDS; i++) _bands[i] = 0;
+
+/** Pre-allocated output array for waveform points (length = WAVE_POINTS). */
+const _wave: number[] = new Array<number>(WAVE_POINTS);
+for (let i = 0; i < WAVE_POINTS; i++) _wave[i] = 0;
+
+/** Pre-computed byte offsets for waveFrom — identical every call. */
+const _waveByteOff = new Int32Array(WAVE_POINTS);
+for (let i = 0; i < WAVE_POINTS; i++) {
+  _waveByteOff[i] = Math.floor((i / WAVE_POINTS) * FFT_SIZE) * 2;
 }
+
+// ---------------------------------------------------------------------------
 
 const hann = new Float64Array(FFT_SIZE);
 for (let i = 0; i < FFT_SIZE; i++) {
@@ -78,36 +93,94 @@ for (let b = 0; b <= BANDS; b++) {
   bandEdges.push(Math.floor(1 + (FFT_SIZE / 2 - 1) * Math.pow(f, 2.2)));
 }
 
-/** Turns one PCM frame (int16 mono) into normalized band levels (0..1). */
-function analyzeFrame(buf: Buffer, peak: { v: number }): number[] {
-  const re = new Float64Array(FFT_SIZE);
-  const im = new Float64Array(FFT_SIZE);
-  for (let i = 0; i < FFT_SIZE; i++) {
-    re[i] = (buf.readInt16LE(i * 2) / 32768) * hann[i]!;
+/** Downsamples a PCM frame to a normalized waveform (-1..1) for the scope.
+ *  Writes into the pre-allocated _wave array — callers must consume before
+ *  the next call. */
+function waveFrom(data: Buffer, offset: number): number[] {
+  for (let i = 0; i < WAVE_POINTS; i++) {
+    _wave[i] = data.readInt16LE(offset + _waveByteOff[i]!) / 32768;
   }
-  fft(re, im);
+  return _wave;
+}
 
-  const bands: number[] = [];
+/** Turns one PCM frame (int16 mono) into normalized band levels (0..1).
+ *  Writes into the pre-allocated _bands array — callers must consume before
+ *  the next call. */
+function analyzeFrame(data: Buffer, offset: number, peak: { v: number }): number[] {
+  // Fill re with windowed samples; zero im.
+  for (let i = 0; i < FFT_SIZE; i++) {
+    _re[i] = (data.readInt16LE(offset + i * 2) / 32768) * hann[i]!;
+    _im[i] = 0;
+  }
+  fft(_re, _im);
+
   let frameMax = 0;
   for (let b = 0; b < BANDS; b++) {
     const lo = bandEdges[b]!;
     const hi = Math.max(lo + 1, bandEdges[b + 1]!);
     let sum = 0;
-    for (let k = lo; k < hi; k++) sum += Math.hypot(re[k]!, im[k]!);
+    for (let k = lo; k < hi; k++) sum += Math.hypot(_re[k]!, _im[k]!);
     const mag = sum / (hi - lo);
-    bands.push(mag);
+    _bands[b] = mag;
     if (mag > frameMax) frameMax = mag;
   }
 
   // Auto-gain: track a decaying peak so quiet and loud tracks both fill nicely.
   peak.v = Math.max(frameMax, peak.v * 0.999);
   const scale = peak.v > 0 ? 1 / peak.v : 0;
-  return bands.map((m) => Math.min(1, Math.sqrt(m * scale)));
+  for (let b = 0; b < BANDS; b++) {
+    _bands[b] = Math.min(1, Math.sqrt(_bands[b]! * scale));
+  }
+  return _bands;
+}
+
+// ---------------------------------------------------------------------------
+// Pre-allocated PCM accumulation buffer — avoids Buffer.concat on every chunk.
+//
+// We allocate once and reuse forever. Incoming chunks are copied in, consumed
+// frames are shifted out. The capacity is generous (64 KiB); a single FFT
+// frame is only 2 KiB, so this handles bursts easily without reallocation.
+// ---------------------------------------------------------------------------
+
+const PCM_BUF_CAPACITY = 65536;
+
+class PcmBuffer {
+  readonly data = Buffer.allocUnsafe(PCM_BUF_CAPACITY);
+  /** Number of valid unconsumed bytes currently in the buffer. */
+  len = 0;
+
+  /** Append incoming chunk. */
+  push(chunk: Buffer): void {
+    const need = this.len + chunk.length;
+    if (need > PCM_BUF_CAPACITY) {
+      // Extremely rare — only if ffmpeg sends a huge burst. Drop oldest data
+      // so we don't exceed capacity. In practice this never fires because
+      // ffmpeg's -re flag paces output to real-time.
+      const drop = need - PCM_BUF_CAPACITY;
+      this.data.copyWithin(0, drop, this.len);
+      this.len -= drop;
+    }
+    chunk.copy(this.data, this.len);
+    this.len += chunk.length;
+  }
+
+  /** Advance past `n` consumed bytes by shifting remaining data forward. */
+  consume(n: number): void {
+    this.len -= n;
+    if (this.len > 0) {
+      this.data.copyWithin(0, n, n + this.len);
+    }
+  }
+
+  /** Reset without reallocating. */
+  reset(): void {
+    this.len = 0;
+  }
 }
 
 export class AudioAnalyzer extends EventEmitter {
   private procs: ChildProcess[] = [];
-  private buf: Buffer = Buffer.alloc(0);
+  private pcm = new PcmBuffer();
   private peak = { v: 0 };
   private gen = 0;
 
@@ -153,13 +226,15 @@ export class AudioAnalyzer extends EventEmitter {
     }
 
     const bytesPerFrame = FFT_SIZE * 2;
+    const pcm = this.pcm;
     ff.stdout?.on("data", (chunk: Buffer) => {
-      this.buf = this.buf.length ? Buffer.concat([this.buf, chunk]) : chunk;
-      while (this.buf.length >= bytesPerFrame) {
-        const frame = this.buf.subarray(0, bytesPerFrame);
-        this.buf = this.buf.subarray(bytesPerFrame);
-        this.emit("bands", analyzeFrame(frame, this.peak));
-        this.emit("wave", waveFrom(frame));
+      pcm.push(chunk);
+      while (pcm.len >= bytesPerFrame) {
+        // analyzeFrame and waveFrom read directly from the pre-allocated
+        // buffer at offset 0 (the start of unconsumed data).
+        this.emit("bands", analyzeFrame(pcm.data, 0, this.peak));
+        this.emit("wave", waveFrom(pcm.data, 0));
+        pcm.consume(bytesPerFrame);
       }
     });
     this.procs = yt ? [yt, ff] : [ff];
@@ -196,6 +271,6 @@ export class AudioAnalyzer extends EventEmitter {
       }
     }
     this.procs = [];
-    this.buf = Buffer.alloc(0);
+    this.pcm.reset();
   }
 }

@@ -9,23 +9,21 @@
 import { writeFileSync, readFileSync, existsSync, statSync } from "node:fs";
 import { STATUS_FILE, ensureConfig } from "./config.ts";
 import type { Player } from "./player.ts";
-
-function fmtTime(s: number): string {
-  if (!isFinite(s) || s < 0) s = 0;
-  const m = Math.floor(s / 60);
-  const sec = Math.floor(s % 60);
-  return `${m}:${sec.toString().padStart(2, "0")}`;
-}
+import { fmtTime } from "./fmt.ts";
 
 /** Starts the periodic writing of the state to disk. */
 export function startStatusBroadcast(player: Player, intervalMs = 1000) {
   ensureConfig();
+  // Only write when the line actually changes, to reduce I/O.
+  let lastLine = "";
   const write = () => {
     const s = player.state;
     if (!s.url) return;
     const icon = s.paused ? "⏸" : "▶";
     const title = (s.title ?? "").replace(/\s+/g, " ").slice(0, 45);
     const line = `${icon} ${title} ${fmtTime(s.position)}/${fmtTime(s.duration)}`;
+    if (line === lastLine) return;
+    lastLine = line;
     try {
       writeFileSync(STATUS_FILE, line);
     } catch {
@@ -50,3 +48,4 @@ export function readStatus(maxAgeMs = 8000): string {
     return "";
   }
 }
+

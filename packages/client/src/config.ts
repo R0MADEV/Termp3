@@ -115,21 +115,32 @@ export interface Settings {
   activePlaylist?: string;
   theme?: string;
   vizMode?: string;
-  eqGains?: number[]; // 10-band equalizer (dB per band)
+  eqGains?: number[];
   // Resume: last track + position within the last playlist.
   lastPlaylist?: string;
   lastUrl?: string;
   lastPos?: number;
+  // Apple Music integration
+  appleCookies?: string;
+  activeProvider?: "youtube" | "apple";
 }
+
+// In-memory settings cache: avoids disk I/O on every loadSettings() call.
+let _settingsCache: Settings | null = null;
 
 /** Reads persisted user settings (empty object if none). */
 export function loadSettings(): Settings {
-  if (!existsSync(SETTINGS_FILE)) return {};
-  try {
-    return JSON.parse(readFileSync(SETTINGS_FILE, "utf8"));
-  } catch {
-    return {};
+  if (_settingsCache) return _settingsCache;
+  if (!existsSync(SETTINGS_FILE)) {
+    _settingsCache = {};
+    return _settingsCache;
   }
+  try {
+    _settingsCache = JSON.parse(readFileSync(SETTINGS_FILE, "utf8"));
+  } catch {
+    _settingsCache = {};
+  }
+  return _settingsCache!;
 }
 
 /** Persists user settings (merges with existing). */
@@ -137,4 +148,7 @@ export function saveSettings(patch: Settings): void {
   ensureConfig();
   const merged = { ...loadSettings(), ...patch };
   writeFileSync(SETTINGS_FILE, JSON.stringify(merged, null, 2));
+  // Update the cache with the merged result so subsequent reads are instant.
+  _settingsCache = merged;
 }
+

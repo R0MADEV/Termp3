@@ -1,15 +1,12 @@
-// Modern terminal UI built with Ink (React). The core (player, playlist,
-// theme, i18n, ytdlp) is reused unchanged; this is only the presentation +
-// input layer.
+// Modern terminal UI built with Ink (React).
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import { EventEmitter } from "node:events";
 import { render, Box, Text, useApp, useInput, useStdout } from "ink";
 import type { Player } from "../../player.ts";
 import { EQ_BANDS } from "../../player.ts";
 import {
   type Track,
-  type SearchResult,
   loadPlaylist,
   listPlaylists,
   activePlaylist,
@@ -41,13 +38,14 @@ import {
 import { loadSettings, saveSettings } from "../../config.ts";
 import { ensureYtDlp } from "../../ytdlp.ts";
 import { AudioAnalyzer, BANDS, WAVE_POINTS } from "../../audio.ts";
+import type { Overlay } from "./overlay.ts";
+import { createCommands, matchCommands } from "./commands.ts";
+import { fmtTime } from "../../fmt.ts";
 
 const SIDEBAR_W = 24;
 const SPECTRUM_H = 6;
 const SPECTRUM_COLS = BANDS;
 const SEARCH_PRESETS = [10, 20, 30, 50, 100];
-
-// 10-band equalizer presets (dB per band: 31Hz … 16kHz).
 const EQ_PRESETS: { name: string; gains: number[] }[] = [
   { name: "Flat", gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
   { name: "Bass Boost", gains: [7, 6, 5, 3, 1, 0, 0, 0, 0, 0] },
@@ -63,12 +61,12 @@ const EQ_LABELS = ["31", "62", "125", "250", "500", "1k", "2k", "4k", "8k", "16k
 /** Command bus so `catunes pause/next/...` (another tab) can drive the UI. */
 export const controlBus = new EventEmitter();
 
-function fmtTime(s: number): string {
-  if (!isFinite(s) || s < 0) s = 0;
-  const m = Math.floor(s / 60);
-  const sec = Math.floor(s % 60);
-  return `${m}:${sec.toString().padStart(2, "0")}`;
-}
+// fmtTime is now imported from ../../fmt.ts (shared across the codebase).
+
+// --- Pre-allocated initial arrays (avoid creating new arrays in useState) ---
+const INIT_SPEC = Object.freeze(new Array(SPECTRUM_COLS).fill(0) as number[]);
+const INIT_PEAKS = Object.freeze(new Array(SPECTRUM_COLS).fill(0) as number[]);
+const INIT_WAVE = Object.freeze(new Array(WAVE_POINTS).fill(0) as number[]);
 
 function bar(ratio: number, width: number): string {
   const filled = Math.max(0, Math.min(width, Math.round(ratio * width)));
@@ -111,18 +109,36 @@ function useTermSize() {
 export const VIZ_MODES = ["bars", "mirror", "smooth", "scope", "plasma"] as const;
 const LEVELS = "▁▂▃▄▅▆▇█";
 
+// LRU cache for hslToHex — called 216× per plasma frame (36 cols × 6 rows).
+// Quantise inputs to reduce key space; cache the last ~512 unique colours.
+const _hslCache = new Map<number, string>();
+const _HSL_CACHE_MAX = 512;
 function hslToHex(h: number, s: number, l: number): string {
-  s /= 100;
-  l /= 100;
+  // Quantise: h to nearest int, s & l to 1 decimal → same visual result.
+  const qh = Math.round(h) | 0;
+  const qs = Math.round(s * 10) | 0;
+  const ql = Math.round(l * 10) | 0;
+  const key = (qh << 16) | (qs << 8) | ql;
+  const cached = _hslCache.get(key);
+  if (cached !== undefined) return cached;
+  const sn = s / 100;
+  const ln = l / 100;
   const k = (n: number) => (n + h / 30) % 12;
-  const a = s * Math.min(l, 1 - l);
+  const a = sn * Math.min(ln, 1 - ln);
   const f = (n: number) => {
-    const c = l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
+    const c = ln - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1));
     return Math.round(255 * c)
       .toString(16)
       .padStart(2, "0");
   };
-  return `#${f(0)}${f(8)}${f(4)}`;
+  const hex = `#${f(0)}${f(8)}${f(4)}`;
+  if (_hslCache.size >= _HSL_CACHE_MAX) {
+    // Evict oldest entry (first key in insertion order).
+    const first = _hslCache.keys().next().value;
+    if (first !== undefined) _hslCache.delete(first);
+  }
+  _hslCache.set(key, hex);
+  return hex;
 }
 
 // Colour columns by frequency: bass (left) → treble (right) across the theme's
@@ -229,7 +245,7 @@ function vizPlasma(frame: number, energy: number): React.ReactNode[] {
   return rows;
 }
 
-function Visualizer({
+const Visualizer = React.memo(function Visualizer({
   mode,
   spec,
   peaks,
@@ -253,7 +269,7 @@ function Visualizer({
     rows = vizPlasma(frame, playing ? Math.max(0.15, energy) : 0.1);
   } else rows = vizBars(spec, peaks);
   return <Box flexDirection="column">{rows}</Box>;
-}
+});
 
 // --- Cat mascot (ᓚᘏᗢ) ---
 // Pacing cat used as a loading spinner; constant width so nothing jitters.
@@ -284,7 +300,7 @@ const CAT_ROWS = [
 const CAT_W = 29;
 const CAT_H = CAT_ROWS.length;
 
-function PixelCat({
+const PixelCat = React.memo(function PixelCat({
   mode,
   beat,
   frame,
@@ -421,9 +437,9 @@ function PixelCat({
       </Box>
     </Box>
   );
-}
+});
 
-function NowPlaying({
+const NowPlaying = React.memo(function NowPlaying({
   state,
   spec,
   peaks,
@@ -533,7 +549,7 @@ function NowPlaying({
       </Box>
     </Box>
   );
-}
+});
 
 /**
  * Virtualized list panel: only the items that fit (maxVisible) are built and
@@ -541,7 +557,7 @@ function NowPlaying({
  * drops the off-screen ones — so a 4,000-track list costs the same as a tiny
  * one.
  */
-function Panel({
+const Panel = React.memo(function Panel({
   title,
   count,
   selected,
@@ -611,10 +627,10 @@ function Panel({
       )}
     </Box>
   );
-}
+});
 
 /** Centered modal frame. */
-function Modal({
+const Modal = React.memo(function Modal({
   title,
   cols,
   rows,
@@ -647,9 +663,9 @@ function Modal({
       </Box>
     </Box>
   );
-}
+});
 
-function PickList({
+const PickList = React.memo(function PickList({
   options,
   selected,
   maxVisible,
@@ -688,23 +704,7 @@ function PickList({
       </Box>
     </Box>
   );
-}
-
-type Overlay =
-  | { kind: "none" }
-  | { kind: "settings" }
-  | { kind: "theme" }
-  | { kind: "lang" }
-  | { kind: "playlists" }
-  | { kind: "searchLimit" }
-  | { kind: "help" }
-  | { kind: "eq" }
-  | { kind: "searchInput" }
-  | { kind: "addInput"; target: "track" | "list" }
-  | { kind: "searchResults"; results: SearchResult[] }
-  | { kind: "confirmTrack"; index: number }
-  | { kind: "confirmPlaylist"; name: string }
-  | { kind: "loading"; text: string };
+});
 
 function App({
   player,
@@ -721,16 +721,16 @@ function App({
 
   const [tracks, setTracks] = useState<Track[]>(initialTracks);
   const [playlists, setPlaylists] = useState<string[]>(listPlaylists());
-  const [focus, setFocus] = useState<"tracks" | "sidebar">("tracks");
+  const [focus, setFocus] = useState<"command" | "sidebar" | "tracks">("tracks");
   const [listIdx, setListIdx] = useState(0);
   const [sideIdx, setSideIdx] = useState(
     Math.max(0, listPlaylists().indexOf(activePlaylist())),
   );
   const [current, setCurrent] = useState(-1);
   const [state, setState] = useState({ ...player.state });
-  const [spec, setSpec] = useState<number[]>(new Array(SPECTRUM_COLS).fill(0));
-  const [peaks, setPeaks] = useState<number[]>(new Array(SPECTRUM_COLS).fill(0));
-  const [wave, setWave] = useState<number[]>(new Array(WAVE_POINTS).fill(0));
+  const [spec, setSpec] = useState<number[]>(INIT_SPEC as unknown as number[]);
+  const [peaks, setPeaks] = useState<number[]>(INIT_PEAKS as unknown as number[]);
+  const [wave, setWave] = useState<number[]>(INIT_WAVE as unknown as number[]);
   const [frame, setFrame] = useState(0);
   const [mode, setMode] = useState<string>(loadSettings().vizMode ?? "bars");
   const [shuffle, setShuffle] = useState(false);
@@ -743,17 +743,37 @@ function App({
   const [filter, setFilter] = useState(""); // filter text for the current list
   const [filtering, setFiltering] = useState(false); // editing the filter
 
+  const settings = loadSettings();
+  const [command, setCommand] = useState("");
+  const [activeProvider, setActiveProvider] = useState<"youtube" | "apple">(
+    settings.activeProvider ?? "youtube",
+  );
+  const [statusMsg, setStatusMsg] = useState("");
+  const [autocompleteIdx, setAutocompleteIdx] = useState(0);
+
+  // Autocomplete: filter commands based on what the user typed.
+  const commandTrimmed = command.trimStart();
+
+
   const [overlay, setOverlay] = useState<Overlay>({ kind: "none" });
   const [sel, setSel] = useState(0); // selection index inside list overlays
   const [input, setInput] = useState(""); // text-input overlays
   const [, bump] = useState(0); // force re-render after theme/lang change
   const prevPaused = useRef(false);
-  const specRef = useRef<number[]>(new Array(SPECTRUM_COLS).fill(0));
-  const smoothRef = useRef<number[]>(new Array(SPECTRUM_COLS).fill(0));
-  const peakRef = useRef<number[]>(new Array(SPECTRUM_COLS).fill(0));
+  const specRef = useRef<number[]>([...INIT_SPEC]);
+  const smoothRef = useRef<number[]>([...INIT_SPEC]);
+  const peakRef = useRef<number[]>([...INIT_SPEC]);
   const errRef = useRef(0); // consecutive failed tracks (stop if all unavailable)
-  const waveRef = useRef<number[]>(new Array(WAVE_POINTS).fill(0));
+  const waveRef = useRef<number[]>([...INIT_WAVE]);
+  // Double-buffer for spectrum and peaks: swap instead of .slice() every tick.
+  const specBufRef = useRef<[number[], number[]]>([[...INIT_SPEC], [...INIT_SPEC]]);
+  const peakBufRef = useRef<[number[], number[]]>([[...INIT_PEAKS], [...INIT_PEAKS]]);
+  const bufIdx = useRef(0);
+  // Cached player state fields to avoid unnecessary setState calls.
+  const prevStateRef = useRef({ position: 0, duration: 0, paused: false, volume: 0, url: "", title: "" });
   const inflight = useRef(new Set<string>()); // URLs whose title is resolving
+  const appleTempRef = useRef<string | null>(null); // temp dir from gamdl to clean up
+  const searchProviderRef = useRef<"youtube" | "apple">("youtube"); // chosen provider for /search
   // Transient cat reaction (wink/scared); cleared once the deadline frame passes.
   const reactRef = useRef<{ type: "wink" | "scared" | "meow"; until: number }>({
     type: "wink",
@@ -766,25 +786,43 @@ function App({
   const panelMax = Math.max(3, rows - 19);
   // Filtered view: indices into `tracks` that match the filter (all if none).
   const filt = filter.trim().toLowerCase();
-  const viewIdx = filt
-    ? tracks.reduce<number[]>((acc, t, i) => {
-        if (t.title.toLowerCase().includes(filt)) acc.push(i);
-        return acc;
-      }, [])
-    : tracks.map((_, i) => i);
+  const viewIdx = useMemo(() => {
+    if (!filt)
+      return tracks.map((_, i) => i);
+    return tracks.reduce<number[]>((acc, t, i) => {
+      if (t.title.toLowerCase().includes(filt)) acc.push(i);
+      return acc;
+    }, []);
+  }, [tracks, filt]);
 
   // --- playback ---
-  const play = (i: number) => {
+  const play = async (i: number) => {
     const tr = tracks[i];
     if (!tr) return;
     setCurrent(i);
     setListIdx(i);
-    react("meow"); // the cat greets a new track
+    react("meow");
+    // Clean up any previous Apple Music temp directory.
+    if (appleTempRef.current) {
+      const { cleanupTempDir } = await import("../../gamdl.ts");
+      cleanupTempDir(appleTempRef.current);
+      appleTempRef.current = null;
+    }
     try {
-      player.load(tr.url);
-      analyzer.start(tr.url, 0);
-    } catch {
-      // A bad URL must never crash the UI.
+      if (tr.url.includes("music.apple.com")) {
+        setStatusMsg("AP Preparing Apple Music track...");
+        const { downloadAppleMusic } = await import("../../gamdl.ts");
+        const dl = await downloadAppleMusic(tr.url);
+        appleTempRef.current = dl.tempDir;
+        player.load(dl.path);
+        analyzer.start(dl.path, 0);
+        setStatusMsg(`[AP] Playing: ${tr.title}`);
+      } else {
+        player.load(tr.url);
+        analyzer.start(tr.url, 0);
+      }
+    } catch (err) {
+      setStatusMsg(`ERR Playback failed: ${String(err)}`);
     }
   };
   const pickNext = (auto: boolean): number | null => {
@@ -836,9 +874,35 @@ function App({
       }
       // A track that actually plays clears the unavailable-streak counter.
       if (player.state.position > 3) errRef.current = 0;
-      setState({ ...player.state });
+      // Only update React state when relevant player fields actually changed
+      // (avoids creating a new state object on every mpv poll).
+      const ps = player.state;
+      const prev = prevStateRef.current;
+      if (
+        ps.position !== prev.position ||
+        ps.duration !== prev.duration ||
+        ps.paused !== prev.paused ||
+        ps.volume !== prev.volume ||
+        ps.url !== prev.url ||
+        ps.title !== prev.title
+      ) {
+        prev.position = ps.position;
+        prev.duration = ps.duration;
+        prev.paused = ps.paused;
+        prev.volume = ps.volume;
+        prev.url = ps.url ?? "";
+        prev.title = ps.title ?? "";
+        setState({ ...ps });
+      }
     };
     const onEnded = (r: string) => {
+      // Clean up Apple Music temp files on track end.
+      if (appleTempRef.current) {
+        import("../../gamdl.ts").then(({ cleanupTempDir }) => {
+          cleanupTempDir(appleTempRef.current!);
+          appleTempRef.current = null;
+        });
+      }
       if (r === "eof") {
         errRef.current = 0;
         advance(true);
@@ -898,7 +962,8 @@ function App({
     const id = setInterval(() => {
       const playing = !!player.state.url && !player.state.paused;
       if (!playing) {
-        specRef.current = specRef.current.map((v) => Math.max(0, v - 0.6));
+        const sr = specRef.current;
+        for (let i = 0; i < sr.length; i++) sr[i] = Math.max(0, sr[i]! - 0.6);
       }
       // Attack fast, release slow → smoother bars; peak caps fall gently.
       const sm = smoothRef.current;
@@ -909,12 +974,38 @@ function App({
         sm[i] = t > sm[i]! ? t : sm[i]! * 0.72 + t * 0.28;
         pk[i] = Math.max(sm[i]!, pk[i]! - 0.12);
       }
-      setSpec(sm.slice());
-      setPeaks(pk.slice());
+      // Double-buffer: copy into the back buffer, then swap — avoids .slice().
+      const bi = bufIdx.current ^= 1;
+      const specBuf = specBufRef.current[bi]!;
+      const peakBuf = peakBufRef.current[bi]!;
+      for (let i = 0; i < sm.length; i++) {
+        specBuf[i] = sm[i]!;
+        peakBuf[i] = pk[i]!;
+      }
+      setSpec(specBuf);
+      setPeaks(peakBuf);
       setWave(waveRef.current);
       setFrame((f) => f + 1);
-      setState({ ...player.state });
-    }, 90);
+      // Only update player state when values actually changed.
+      const ps = player.state;
+      const prev = prevStateRef.current;
+      if (
+        ps.position !== prev.position ||
+        ps.duration !== prev.duration ||
+        ps.paused !== prev.paused ||
+        ps.volume !== prev.volume ||
+        ps.url !== prev.url ||
+        ps.title !== prev.title
+      ) {
+        prev.position = ps.position;
+        prev.duration = ps.duration;
+        prev.paused = ps.paused;
+        prev.volume = ps.volume;
+        prev.url = ps.url ?? "";
+        prev.title = ps.title ?? "";
+        setState({ ...ps });
+      }
+    }, 120);
     return () => clearInterval(id);
   }, [player]);
 
@@ -988,19 +1079,88 @@ function App({
         lastPos: Math.floor(player.state.position),
       });
     }
+    // Clean up Apple Music temp files.
+    if (appleTempRef.current) {
+      import("../../gamdl.ts").then(({ cleanupTempDir }) => {
+        cleanupTempDir(appleTempRef.current!);
+      });
+    }
     analyzer.stop();
     player.quit();
     exit();
   };
 
   // --- async actions ---
-  const doSearch = async (query: string) => {
+  const execSearch = async (query: string, provider: "youtube" | "apple") => {
     setOverlay({ kind: "loading", text: t("ui.searching") });
-    await ensureYtDlp(() => {});
-    const results = await searchYouTube(query, loadSettings().searchLimit ?? 20);
-    if (results.length === 0) return setOverlay({ kind: "none" });
-    setSel(0);
-    setOverlay({ kind: "searchResults", results });
+    if (provider === "youtube") {
+      await ensureYtDlp(() => {});
+      const results = await searchYouTube(query, loadSettings().searchLimit ?? 20);
+      if (results.length === 0) return setOverlay({ kind: "none" });
+      setSel(0);
+      setOverlay({ kind: "searchResults", results });
+    } else {
+      const { searchApple } = await import("../../apple.ts");
+      try {
+        const results = await searchApple(query);
+        if (results.length === 0) {
+          setStatusMsg("ERR No results found on Apple Music.");
+          return setOverlay({ kind: "none" });
+        }
+        setSel(0);
+        setOverlay({ kind: "searchResults", results });
+        setStatusMsg(`OK Found ${results.length} songs on Apple Music.`);
+      } catch (err) {
+        setStatusMsg(`ERR Apple Music search failed: ${String(err)}`);
+        setOverlay({ kind: "none" });
+      }
+    }
+  };
+
+  // Command registry: built once, accessed via name lookup.
+  const commands = useMemo(
+    () =>
+      createCommands({
+        setStatusMsg,
+        setActiveProvider,
+        saveSettings: saveSettings as (s: Record<string, unknown>) => void,
+        setOverlay,
+        setSel,
+        setTracks,
+        setListIdx,
+        activeProvider,
+        player,
+        viewIdx,
+        current,
+        tracks,
+        execSearch,
+        play,
+        advance,
+        quit,
+        openOverlay,
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [activeProvider, viewIdx.length, current, tracks.length],
+  );
+
+  // Autocomplete: filter commands based on what the user typed.
+  const showAutocomplete = commandTrimmed.startsWith("/") && !commandTrimmed.includes(" ");
+  const filteredCmds = showAutocomplete
+    ? matchCommands(commandTrimmed, commands)
+    : [];
+  const acSel = Math.min(autocompleteIdx, Math.max(0, filteredCmds.length - 1));
+
+  const handleCommand = async (raw: string) => {
+    const cmd = raw.trim();
+    if (!cmd) return;
+    const [action, ...argsArr] = cmd.split(/\s+/);
+    const args = argsArr.join(" ");
+    const cmdObj = commands[action?.toLowerCase() ?? ""];
+    if (cmdObj) {
+      await cmdObj.handler(args);
+    } else {
+      setStatusMsg(`? Unknown command: ${action?.toLowerCase() ?? ""}`);
+    }
   };
   const openList = (name: string) => {
     setPlaylists(listPlaylists());
@@ -1047,35 +1207,23 @@ function App({
     // Overlays first.
     if (overlay.kind === "loading") return;
 
-    // Live filter editing for the current list.
-    if (filtering) {
-      if (key.escape) {
-        setFilter("");
-        setFiltering(false);
-        setListIdx(0);
-        return;
-      }
-      if (key.return) {
-        setFiltering(false);
-        if (viewIdx[listIdx] != null) play(viewIdx[listIdx]!);
-        return;
-      }
-      if (key.upArrow) return setListIdx((i) => Math.max(0, i - 1));
-      if (key.downArrow)
-        return setListIdx((i) => Math.min(viewIdx.length - 1, i + 1));
-      if (key.backspace || key.delete) {
-        setFilter((s) => s.slice(0, -1));
-        setListIdx(0);
-        return;
-      }
-      if (ch && !key.ctrl && !key.meta) {
-        setFilter((s) => s + ch);
-        setListIdx(0);
-        return;
-      }
+    if (overlay.kind === "searchResults") {
+      if (key.escape) return closeOverlay();
+      if (key.upArrow) return setSel((i) => Math.max(0, i - 1));
+      if (key.downArrow) return setSel((i) => Math.min(overlay.results.length - 1, i + 1));
+      if (key.return) return chooseOverlay();
       return;
     }
 
+    if (overlay.kind === "searchProvider") {
+      if (key.escape) return closeOverlay();
+      if (key.upArrow) return setSel((i) => Math.max(0, i - 1));
+      if (key.downArrow) return setSel((i) => Math.min(1, i + 1));
+      if (key.return) return chooseOverlay();
+      return;
+    }
+
+    // --- text-input overlays (search, add) ---
     if (overlay.kind === "searchInput" || overlay.kind === "addInput") {
       if (key.escape) return closeOverlay();
       if (key.return) {
@@ -1083,9 +1231,12 @@ function App({
         const ov = overlay;
         closeOverlay();
         if (!value) return;
-        if (ov.kind === "searchInput") void doSearch(value);
-        else if (ov.target === "list") void importList(value);
-        else addTrack(value);
+        if (ov.kind === "searchInput") {
+          void execSearch(value, searchProviderRef.current);
+        } else if (ov.kind === "addInput") {
+          if (ov.target === "list") void importList(value);
+          else addTrack(value);
+        }
         return;
       }
       if (key.backspace || key.delete) return setInput((s) => s.slice(0, -1));
@@ -1093,126 +1244,91 @@ function App({
       return;
     }
 
-    if (overlay.kind === "confirmTrack") {
-      if (key.return || ch === "y") {
-        removeUrl(tracks[overlay.index]!.url);
-        if (current === overlay.index) setCurrent(-1);
-        reload();
-        react("scared"); // the cat is startled when you delete
+    // --- slash-command autocomplete ---
+    if (showAutocomplete && filteredCmds.length > 0) {
+      if (key.tab) {
+        const cmd = filteredCmds[acSel];
+        if (cmd) { setCommand(cmd.name + " "); setAutocompleteIdx(0); }
+        return;
       }
-      return closeOverlay();
-    }
-    if (overlay.kind === "confirmPlaylist") {
-      if (key.return || ch === "y") {
-        removePlaylist(overlay.name);
-        const remaining = listPlaylists();
-        setPlaylists(remaining);
-        if (activePlaylist() === overlay.name) switchPlaylist(remaining[0] ?? "Default");
-        react("scared");
+      if (key.upArrow) {
+        setAutocompleteIdx((i) => Math.max(0, i - 1));
+        return;
       }
-      return closeOverlay();
+      if (key.downArrow) {
+        setAutocompleteIdx((i) => Math.min(filteredCmds.length - 1, i + 1));
+        return;
+      }
+      if (key.escape) {
+        setCommand("");
+        setAutocompleteIdx(0);
+        return;
+      }
+      if (key.return && commandTrimmed === filteredCmds[acSel]?.name) {
+        void handleCommand(command);
+        setCommand("");
+        setAutocompleteIdx(0);
+        return;
+      }
     }
 
-    const listOverlays: Record<string, number> = {
-      settings: 4,
-      theme: listThemes().length,
-      lang: SUPPORTED_LOCALES.length,
-      playlists: playlists.length,
-      searchLimit: SEARCH_PRESETS.length,
-      searchResults:
-        overlay.kind === "searchResults" ? overlay.results.length : 0,
-    };
-    if (overlay.kind in listOverlays) {
-      const count = listOverlays[overlay.kind]!;
-      if (key.escape) return closeOverlay();
-      if (key.upArrow) return setSel((i) => Math.max(0, i - 1));
-      if (key.downArrow) return setSel((i) => Math.min(count - 1, i + 1));
-      if (key.return) return chooseOverlay();
+    // --- Tab: cycle focus between command / playlists / tracks ---
+    if (key.tab && !showAutocomplete) {
+      setFocus((f) =>
+        f === "command" ? "sidebar" : f === "sidebar" ? "tracks" : "command",
+      );
       return;
     }
 
-    if (overlay.kind === "help") return closeOverlay();
-
-    if (overlay.kind === "eq") {
-      if (key.escape || ch === "e") return closeOverlay();
-      if (key.leftArrow) return setEqBand((b) => Math.max(0, b - 1));
-      if (key.rightArrow)
-        return setEqBand((b) => Math.min(EQ_BANDS.length - 1, b + 1));
-      if (key.upArrow || key.downArrow) {
-        const next = [...eq];
-        const d = key.upArrow ? 1 : -1;
-        next[eqBand] = Math.max(-12, Math.min(12, (next[eqBand] ?? 0) + d));
-        return applyEq(next);
-      }
-      if (ch === "0") return applyEq(new Array(EQ_BANDS.length).fill(0));
-      if (ch === "p") {
-        // Cycle to the next preset by matching the current gains.
-        const i = EQ_PRESETS.findIndex(
-          (pr) => JSON.stringify(pr.gains) === JSON.stringify(eq),
-        );
-        return applyEq(EQ_PRESETS[(i + 1) % EQ_PRESETS.length]!.gains);
+    // --- Enter on empty command: play track or switch playlist ---
+    if (key.return && command.trim() === "") {
+      if (focus === "tracks" && viewIdx[listIdx] != null) {
+        play(viewIdx[listIdx]!);
+      } else if (focus === "sidebar" && playlists[sideIdx]) {
+        switchPlaylist(playlists[sideIdx]!);
+      } else {
+        setFocus("command");
       }
       return;
     }
 
-    // Main view.
-    if (ch === "q") return quit();
-    if (ch === " ") return player.togglePause();
-    if (key.tab) return setFocus((f) => (f === "tracks" ? "sidebar" : "tracks"));
-    if (key.leftArrow) return player.seek(-5);
-    if (key.rightArrow) return player.seek(5);
-    if (ch === "n") return advance(false);
-    if (ch === "p") return play((current - 1 + tracks.length) % (tracks.length || 1));
-    if (ch === "s") return setShuffle((v) => !v);
-    if (ch === "r")
-      return setRepeat((v) => (v === "off" ? "all" : v === "all" ? "one" : "off"));
-    if (ch === "v") {
-      const idx = (VIZ_MODES as readonly string[]).indexOf(mode);
-      const m = VIZ_MODES[(idx + 1) % VIZ_MODES.length]!;
-      setMode(m);
-      saveSettings({ vizMode: m });
-      return;
-    }
-    if (ch === "m") return toggleMute();
-    if (ch === "+" || ch === "=") return setVol(player.state.volume + 5);
-    if (ch === "-") return setVol(player.state.volume - 5);
-    if (ch === "/") return openOverlay({ kind: "searchInput" });
-    if (ch === "a")
-      return openOverlay({
-        kind: "addInput",
-        target: focus === "sidebar" ? "list" : "track",
-      });
-    if (ch === "o") return openOverlay({ kind: "settings" });
-    if (ch === "e") return openOverlay({ kind: "eq" });
-    if (ch === "f") {
-      setFocus("tracks");
-      setFiltering(true);
-      return;
-    }
-    if (ch === "?") return openOverlay({ kind: "help" });
-    if (ch === "d") {
-      if (focus === "sidebar" && playlists[sideIdx]) {
-        return openOverlay({ kind: "confirmPlaylist", name: playlists[sideIdx]! });
-      }
-      if (viewIdx[listIdx] != null)
-        return openOverlay({ kind: "confirmTrack", index: viewIdx[listIdx]! });
-      return;
-    }
-
-    if (focus === "tracks") {
-      if (key.upArrow) return setListIdx((i) => Math.max(0, i - 1));
-      if (key.downArrow)
-        return setListIdx((i) => Math.min(viewIdx.length - 1, i + 1));
-      if (key.return && viewIdx[listIdx] != null) return play(viewIdx[listIdx]!);
-      return;
-    }
-    if (key.upArrow) return setSideIdx((i) => Math.max(0, i - 1));
-    if (key.downArrow) return setSideIdx((i) => Math.min(playlists.length - 1, i + 1));
+    // Default: capture into command buffer
     if (key.return) {
-      const name = playlists[sideIdx];
-      if (name) switchPlaylist(name);
+      setFocus("command");
+      void handleCommand(command);
+      setCommand("");
+      setAutocompleteIdx(0);
+      return;
+    }
+    if (key.backspace || key.delete) {
+      setFocus("command");
+      setCommand((s) => s.slice(0, -1));
+      setAutocompleteIdx(0);
+      return;
+    }
+    if (key.escape) {
+      setCommand("");
+      setAutocompleteIdx(0);
+      return;
+    }
+    if (ch && !key.ctrl && !key.meta) {
+      setFocus("command");
+      setCommand((s) => s + ch);
+      setAutocompleteIdx(0);
+    }
+    
+    // Arrow-key navigation based on focus (when command is empty).
+    if (command === "") {
+      if (focus === "sidebar") {
+        if (key.upArrow) return setSideIdx((i) => Math.max(0, i - 1));
+        if (key.downArrow) return setSideIdx((i) => Math.min(playlists.length - 1, i + 1));
+      } else if (focus === "tracks") {
+        if (key.upArrow) return setListIdx((i) => Math.max(0, i - 1));
+        if (key.downArrow) return setListIdx((i) => Math.min(viewIdx.length - 1, i + 1));
+      }
     }
   });
+
 
   function openOverlay(o: Overlay) {
     setInput("");
@@ -1268,6 +1384,15 @@ function App({
       const n = SEARCH_PRESETS[sel];
       if (n) saveSettings({ searchLimit: n });
       return closeOverlay();
+    }
+    if (overlay.kind === "searchProvider") {
+      const provider = sel === 0 ? "youtube" : "apple";
+      searchProviderRef.current = provider;
+      setActiveProvider(provider);
+      saveSettings({ activeProvider: provider });
+      closeOverlay();
+      openOverlay({ kind: "searchInput" });
+      return;
     }
     if (overlay.kind === "searchResults") {
       const r = overlay.results[sel];
@@ -1433,8 +1558,8 @@ function App({
         />
         <Panel
           title={
-            filtering || filt
-              ? `filter: ${filter}${filtering ? "▌" : ""}  (${viewIdx.length})`
+            filt
+              ? `filter: ${filter} (${viewIdx.length})`
               : t("ui.playlist", { n: tracks.length }).trim()
           }
           count={viewIdx.length}
@@ -1446,11 +1571,48 @@ function App({
           flexGrow={1}
         />
       </Box>
-      <Box paddingX={1}>
-        <Text color={accent} dimColor>
-          ↑↓ · ↵ play · space · n/p · s/r · v viz ({mode}) · e eq · / search ·
-          f filter · a add · d del · o settings · ? help · q quit
-        </Text>
+      <Box paddingX={1} flexDirection="column">
+        {statusMsg && (
+          <Text italic color="yellow">
+            {statusMsg}
+          </Text>
+        )}
+        {showAutocomplete && filteredCmds.length > 0 && (
+          <Box flexDirection="column" marginBottom={1}>
+            {filteredCmds.slice(0, 8).map((cmd, i) => (
+              <Box key={cmd.name}>
+                <Text
+                  color={i === acSel ? "black" : accent}
+                  backgroundColor={i === acSel ? accent : undefined}
+                >
+                  {i === acSel ? "› " : "  "}
+                  {cmd.syntax}
+                </Text>
+                <Text dimColor={i !== acSel}>  {cmd.desc}</Text>
+              </Box>
+            ))}
+            <Box marginTop={1}>
+              <Text dimColor>↹ complete · ↑↓ choose · ↵ execute · esc dismiss</Text>
+            </Box>
+          </Box>
+        )}
+        <Box>
+          <Text
+            color={focus === "command" ? accent : "gray"}
+            bold={focus === "command"}
+          >
+            {activeProvider === "apple" ? "AP" : "YT"} {"› "}
+          </Text>
+          <Text color={focus === "command" ? accent : "gray"}>
+            {command}
+          </Text>
+          <Text color={focus === "command" ? accent : "gray"}>
+            {frame % 10 < 5 ? "█" : " "}
+          </Text>
+          {focus === "command" && (
+            <Text dimColor>  (Tab to cycle)</Text>
+          )}
+        </Box>
       </Box>
     </Box>
   );
@@ -1512,6 +1674,17 @@ function renderOverlay(
           selected={sel}
           maxVisible={maxVisible}
           options={SEARCH_PRESETS.map((n) => t("ui.resultsCount", { n }))}
+        />
+      </Modal>
+    );
+  }
+  if (overlay.kind === "searchProvider") {
+    return (
+      <Modal title=" Search on… " cols={cols} rows={rows} width={wide}>
+        <PickList
+          selected={sel}
+          maxVisible={maxVisible}
+          options={["YT  YouTube", "AP  Apple Music"]}
         />
       </Modal>
     );
@@ -1580,8 +1753,9 @@ function renderOverlay(
         <Text>
           ↑↓ navigate · ↵ play · space pause · ←→ seek{"\n"}
           n/p next/prev · s shuffle · r repeat · v visualizer{"\n"}
-          e equalizer · f filter · / search · a add · d delete{"\n"}
-          o settings · +/- volume · m mute · Tab panel · ? help · q quit
+          e equalizer · f filter · a add · d delete{"\n"}
+          o settings · +/- volume · m mute · ? help · q quit{"\n"}
+          / slash commands · ↹ autocomplete
         </Text>
         <Box marginTop={1}>
           <Text dimColor>esc to close</Text>
