@@ -44,7 +44,7 @@ export function eqFilterChain(gains: number[]): string {
   // Build the chain using pre-computed prefixes.
   const parts: string[] = new Array(EQ_BANDS.length);
   for (let i = 0; i < EQ_BANDS.length; i++) {
-    parts[i] = _EQ_PREFIXES[i] + rounded[i];
+    parts[i] = _EQ_PREFIXES[i]! + rounded[i]!;
   }
   _lastEqResult = `lavfi=[${parts.join(",")}]`;
   _lastEqKey = key;

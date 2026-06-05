@@ -288,7 +288,7 @@ function _compile(template: string): CompiledTemplate {
   _PLACEHOLDER_RE.lastIndex = 0;
   while ((m = _PLACEHOLDER_RE.exec(template)) !== null) {
     parts.push(template.slice(lastIndex, m.index));
-    slots.push(m[1]);
+    slots.push(m[1]!);
     lastIndex = _PLACEHOLDER_RE.lastIndex;
   }
   parts.push(template.slice(lastIndex));
@@ -314,10 +314,11 @@ export function t(key: string, vars?: Record<string, string | number>): string {
   const { parts, slots } = compiled;
   if (slots.length === 0) return raw;
 
-  let result = parts[0];
+  let result = parts[0]!;
   for (let i = 0; i < slots.length; i++) {
-    const v = vars[slots[i]];
-    result += (v !== undefined ? String(v) : `{${slots[i]}}`) + parts[i + 1];
+    const slotKey = slots[i]!;
+    const v = vars[slotKey];
+    result += (v !== undefined ? String(v) : `{${slotKey}}`) + parts[i + 1]!;
   }
   return result;
 }

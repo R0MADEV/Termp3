@@ -19,7 +19,7 @@ function cookiesToNetscape(cookieString: string): string {
     "\n";
   const cookies = cookieString.split(";");
   for (let i = 0; i < cookies.length; i++) {
-    const raw = cookies[i].trim();
+    const raw = cookies[i]!.trim();
     if (!raw) continue;
     const eq = raw.indexOf("=");
     if (eq < 0) continue;
