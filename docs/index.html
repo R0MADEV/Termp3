@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
     <title>catunes — retro terminal music player</title>
     <meta
       name="description"
@@ -40,10 +41,11 @@
       }
       a { color: var(--green); text-decoration: none; }
       .wrap { max-width: 960px; margin: 0 auto; padding: 0 18px; }
-      header { padding: 52px 0 16px; text-align: left; }
-      .logo-cat { color: var(--green); font-size: 60px; line-height: 1; font-weight: 700; }
-      .logo-name { color: var(--green); font-size: 38px; font-weight: 700; margin-top: 2px; }
-      h1 { color: var(--green); font-size: 34px; margin: 16px 0 6px; }
+      .topbar { padding: 26px 0 0 30px; }
+      .logo-cat { color: var(--green); font-size: 44px; line-height: 1; font-weight: 700; }
+      .logo-name { color: var(--green); font-size: 24px; font-weight: 700; letter-spacing: 1px; }
+      header { padding: 40px 0 16px; text-align: left; }
+      h1 { color: var(--green); font-size: 34px; margin: 0 0 6px; }
       .tag { color: var(--text); margin: 0 0 2px; max-width: 620px; }
       .sub { color: var(--dim); }
 
@@ -124,9 +126,11 @@
     </style>
   </head>
   <body>
-    <header class="wrap">
+    <div class="topbar">
       <div class="logo-cat">ᓚᘏᗢ</div>
       <div class="logo-name">catunes</div>
+    </div>
+    <header class="wrap">
       <h1>music in your terminal</h1>
       <p class="tag">A retro terminal music player with a real audio-reactive visualizer.</p>
       <p class="sub">YouTube · radios · local files — no downloads. Free &amp; open source.</p>
