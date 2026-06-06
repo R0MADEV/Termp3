@@ -18,9 +18,9 @@
     <meta name="twitter:card" content="summary_large_image" />
     <style>
       :root {
-        --bg: #0d1117;
-        --panel: #11161d;
-        --border: #30363d;
+        --bg: #080a08;
+        --panel: #0e120e;
+        --border: #2a322a;
         --text: #c9d1d9;
         --dim: #6e7681;
         --green: #3fb950;
@@ -87,7 +87,7 @@
 
       .cmdbox {
         display: inline-flex; align-items: center; gap: 12px; cursor: pointer; margin-top: 22px;
-        background: #0b0e13; border: 1px solid var(--border); border-radius: 10px;
+        background: #060806; border: 1px solid var(--border); border-radius: 10px;
         padding: 11px 16px; font-size: 16px; color: var(--green);
       }
       .cmdbox .copy { color: var(--dim); font-size: 12px; }
@@ -102,7 +102,16 @@
       .card { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 16px 18px; }
       .card h3 { margin: 0 0 4px; font-size: 16px; color: var(--text); }
       .card p { margin: 0; color: var(--dim); font-size: 14px; }
-      .install { background: #0b0e13; border: 1px solid var(--border); border-radius: 12px; padding: 22px; }
+      kbd {
+        display: inline-block; background: var(--panel); color: var(--green);
+        border: 1px solid var(--border); border-bottom-width: 3px; border-radius: 6px;
+        padding: 3px 9px; font-family: var(--mono); font-size: 13px;
+      }
+      .keys { line-height: 2.6; }
+      .keys .d { color: var(--dim); margin: 0 16px 0 5px; }
+      .cli .l { color: var(--green); }
+      .cli .c { color: var(--dim); }
+      .install { background: #060806; border: 1px solid var(--border); border-radius: 12px; padding: 22px; }
       .install .l { color: var(--green); }
       .install .note { color: var(--dim); font-size: 13px; margin-top: 12px; line-height: 1.7; }
       footer { text-align: center; color: var(--dim); padding: 44px 18px 64px; font-size: 13px; border-top: 1px solid var(--border); margin-top: 56px; }
@@ -191,6 +200,34 @@
         <div class="card"><h3>🐱 Animated cat</h3><p>A little cat that dances, sings and reacts to your music.</p></div>
         <div class="card"><h3>🌍 Multi-language</h3><p>English &amp; Spanish, clean keyboard-driven TUI.</p></div>
         <div class="card"><h3>🖥️ Cross-platform</h3><p>macOS, Linux and Windows. One command.</p></div>
+      </div>
+
+      <h2>controls</h2>
+      <div class="keys">
+        <kbd>↑ ↓</kbd><span class="d">navigate</span>
+        <kbd>↵</kbd><span class="d">play</span>
+        <kbd>space</kbd><span class="d">pause</span>
+        <kbd>← →</kbd><span class="d">seek</span>
+        <kbd>n</kbd><kbd>p</kbd><span class="d">next / prev</span>
+        <kbd>/</kbd><span class="d">search YouTube</span>
+        <kbd>R</kbd><span class="d">radios</span>
+        <kbd>e</kbd><span class="d">equalizer</span>
+        <kbd>f</kbd><span class="d">filter</span>
+        <kbd>v</kbd><span class="d">visualizer</span>
+        <kbd>a</kbd><span class="d">add</span>
+        <kbd>o</kbd><span class="d">settings</span>
+        <kbd>?</kbd><span class="d">help</span>
+        <kbd>q</kbd><span class="d">quit</span>
+      </div>
+
+      <h2>command line</h2>
+      <div class="install cli">
+        <div class="l">$ catunes<span class="c">                  # open the player</span></div>
+        <div class="l">$ catunes play "&lt;url&gt;"<span class="c">     # play a YouTube/radio/file</span></div>
+        <div class="l">$ catunes add "&lt;url&gt;"<span class="c">      # add to your playlist</span></div>
+        <div class="l">$ catunes pause | next | vol +5<span class="c">  # control from any tab</span></div>
+        <div class="l">$ catunes off<span class="c">              # stop all playback</span></div>
+        <div class="l">$ catunes doctor<span class="c">           # check dependencies</span></div>
       </div>
 
       <h2>install</h2>
