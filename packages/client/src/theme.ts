@@ -17,6 +17,12 @@ const BUILTIN: Record<string, Theme> = {
   Cyan: { accent: "cyan", spectrum: ["cyan", "blue", "magenta"] },
   Magenta: { accent: "magenta", spectrum: ["magenta", "blue", "cyan"] },
   Mono: { accent: "white", spectrum: ["gray", "white", "white"] },
+  // Popular dotfile palettes (true-color terminals).
+  Catppuccin: { accent: "#cba6f7", spectrum: ["#a6e3a1", "#f9e2af", "#f38ba8"] },
+  Dracula: { accent: "#bd93f9", spectrum: ["#8be9fd", "#bd93f9", "#ff79c6"] },
+  Gruvbox: { accent: "#fabd2f", spectrum: ["#b8bb26", "#fabd2f", "#fb4934"] },
+  Nord: { accent: "#88c0d0", spectrum: ["#a3be8c", "#ebcb8b", "#bf616a"] },
+  "Tokyo Night": { accent: "#7aa2f7", spectrum: ["#9ece6a", "#e0af68", "#f7768e"] },
 };
 
 let cached: Theme | null = null;
