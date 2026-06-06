@@ -40,20 +40,22 @@
       }
       a { color: var(--green); text-decoration: none; }
       .wrap { max-width: 960px; margin: 0 auto; padding: 0 18px; }
-      header { padding: 52px 0 10px; text-align: center; }
-      .brand { color: var(--green); font-size: 28px; font-weight: 700; }
-      h1 { color: var(--green); font-size: 40px; margin: 6px 0; }
-      .tag { color: var(--text); margin: 0 auto 2px; max-width: 600px; }
+      header { padding: 52px 0 16px; text-align: left; }
+      .logo-cat { color: var(--green); font-size: 60px; line-height: 1; font-weight: 700; }
+      .logo-name { color: var(--green); font-size: 38px; font-weight: 700; margin-top: 2px; }
+      h1 { color: var(--green); font-size: 34px; margin: 16px 0 6px; }
+      .tag { color: var(--text); margin: 0 0 2px; max-width: 620px; }
       .sub { color: var(--dim); }
 
       /* ── recreated TUI ── */
       .tui {
         background: var(--bg);
         border: 1px solid var(--border);
-        border-radius: 12px;
-        padding: 14px 16px;
+        border-radius: 14px;
+        padding: 22px 26px;
         box-shadow: 0 24px 60px #0009;
         overflow-x: auto;
+        font-size: 17px;
       }
       .tui .green { color: var(--green); }
       .tui .dim { color: var(--dim); }
@@ -66,7 +68,7 @@
       .np-top { display: flex; justify-content: space-between; gap: 10px; color: var(--green); }
       .np-top .ctrl { white-space: nowrap; }
       .artist { color: var(--dim); }
-      .viz { display: flex; align-items: flex-end; gap: 3px; height: 52px; margin: 8px 0; }
+      .viz { display: flex; align-items: flex-end; gap: 4px; height: 72px; margin: 10px 0; }
       .viz i { width: 7px; background: var(--green); border-radius: 2px 2px 0 0; animation: bounce 1s ease-in-out infinite; }
       .viz i:nth-child(3n) { background: var(--amber); }
       .viz i:nth-child(8n) { background: var(--red); }
@@ -74,7 +76,7 @@
       .prog .bar { color: var(--green); }
       .prog .t { color: var(--dim); }
       .catwrap { display: flex; flex-direction: column; align-items: center; }
-      .cat { color: var(--green); white-space: pre; font-size: 12px; line-height: 1.1; margin: 0; }
+      .cat { color: var(--green); white-space: pre; font-size: 14px; line-height: 1.1; margin: 0; }
       .panels { display: flex; gap: 8px; }
       .side { width: 170px; flex-shrink: 0; }
       .list { flex: 1; min-width: 0; }
@@ -123,7 +125,8 @@
   </head>
   <body>
     <header class="wrap">
-      <div class="brand">ᓚᘏᗢ catunes</div>
+      <div class="logo-cat">ᓚᘏᗢ</div>
+      <div class="logo-name">catunes</div>
       <h1>music in your terminal</h1>
       <p class="tag">A retro terminal music player with a real audio-reactive visualizer.</p>
       <p class="sub">YouTube · radios · local files — no downloads. Free &amp; open source.</p>
@@ -164,14 +167,14 @@
           <div class="box muted side">
             <div class="ttl off">Listas</div>
             <div class="it">▶ Default</div>
+            <div class="it">&nbsp;&nbsp;★ Favorites</div>
             <div class="it">&nbsp;&nbsp;Radios</div>
             <div class="it">&nbsp;&nbsp;Lo-fi</div>
-            <div class="it">&nbsp;&nbsp;Favoritos</div>
           </div>
           <div class="box list">
             <div class="ttl">PLAYLIST · 12</div>
-            <div class="it">&nbsp;&nbsp;Daft Punk - Around the World</div>
-            <div class="it play">▶ Tame Impala - The Less I Know The Better</div>
+            <div class="it">&nbsp;&nbsp;★ Daft Punk - Around the World</div>
+            <div class="it play">▶ ★ Tame Impala - The Less I Know The Better</div>
             <div class="it sel">› Gorillaz - Feel Good Inc.</div>
             <div class="it">&nbsp;&nbsp;ᓚᘏᗢ SomaFM — Groove Salad</div>
             <div class="it">&nbsp;&nbsp;Bonobo - Kerala</div>
