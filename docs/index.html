@@ -107,8 +107,10 @@
         border: 1px solid var(--border); border-bottom-width: 3px; border-radius: 6px;
         padding: 3px 9px; font-family: var(--mono); font-size: 13px;
       }
-      .keys { line-height: 2.6; }
-      .keys .d { color: var(--dim); margin: 0 16px 0 5px; }
+      .keys { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px 18px; }
+      .k { display: flex; align-items: center; }
+      .kc { min-width: 84px; display: inline-flex; gap: 5px; flex-shrink: 0; }
+      .keys .d { color: var(--dim); }
       .cli .l { color: var(--green); }
       .cli .c { color: var(--dim); }
       .install { background: #060806; border: 1px solid var(--border); border-radius: 12px; padding: 22px; }
@@ -204,20 +206,20 @@
 
       <h2>controls</h2>
       <div class="keys">
-        <kbd>↑ ↓</kbd><span class="d">navigate</span>
-        <kbd>↵</kbd><span class="d">play</span>
-        <kbd>space</kbd><span class="d">pause</span>
-        <kbd>← →</kbd><span class="d">seek</span>
-        <kbd>n</kbd><kbd>p</kbd><span class="d">next / prev</span>
-        <kbd>/</kbd><span class="d">search YouTube</span>
-        <kbd>R</kbd><span class="d">radios</span>
-        <kbd>e</kbd><span class="d">equalizer</span>
-        <kbd>f</kbd><span class="d">filter</span>
-        <kbd>v</kbd><span class="d">visualizer</span>
-        <kbd>a</kbd><span class="d">add</span>
-        <kbd>o</kbd><span class="d">settings</span>
-        <kbd>?</kbd><span class="d">help</span>
-        <kbd>q</kbd><span class="d">quit</span>
+        <div class="k"><span class="kc"><kbd>↑ ↓</kbd></span><span class="d">navigate</span></div>
+        <div class="k"><span class="kc"><kbd>↵</kbd></span><span class="d">play</span></div>
+        <div class="k"><span class="kc"><kbd>space</kbd></span><span class="d">pause</span></div>
+        <div class="k"><span class="kc"><kbd>← →</kbd></span><span class="d">seek</span></div>
+        <div class="k"><span class="kc"><kbd>n</kbd><kbd>p</kbd></span><span class="d">next / prev</span></div>
+        <div class="k"><span class="kc"><kbd>/</kbd></span><span class="d">search YouTube</span></div>
+        <div class="k"><span class="kc"><kbd>R</kbd></span><span class="d">radios</span></div>
+        <div class="k"><span class="kc"><kbd>e</kbd></span><span class="d">equalizer</span></div>
+        <div class="k"><span class="kc"><kbd>f</kbd></span><span class="d">filter</span></div>
+        <div class="k"><span class="kc"><kbd>v</kbd></span><span class="d">visualizer</span></div>
+        <div class="k"><span class="kc"><kbd>a</kbd></span><span class="d">add</span></div>
+        <div class="k"><span class="kc"><kbd>o</kbd></span><span class="d">settings</span></div>
+        <div class="k"><span class="kc"><kbd>?</kbd></span><span class="d">help</span></div>
+        <div class="k"><span class="kc"><kbd>q</kbd></span><span class="d">quit</span></div>
       </div>
 
       <h2>command line</h2>
