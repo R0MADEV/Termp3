@@ -18,12 +18,14 @@ import {
   removePlaylist,
   resolveTitlesAt,
   cacheTitles,
+  cacheStation,
   addUrl,
   removeUrl,
   searchYouTube,
   isPlaylistUrl,
   fetchPlaylist,
 } from "../../playlist.ts";
+import { searchRadios, type RadioStation } from "../../radio.ts";
 import {
   theme,
   listThemes,
@@ -435,6 +437,7 @@ function NowPlaying({
   repeat,
   width,
   artist,
+  trackTitle,
   reaction,
 }: {
   state: Player["state"];
@@ -446,13 +449,20 @@ function NowPlaying({
   loading: boolean;
   shuffle: boolean;
   repeat: "off" | "all" | "one";
+  trackTitle?: string;
   width: number;
   artist?: string;
   reaction: "wink" | "scared" | "meow" | null;
 }) {
   const accent = theme().accent;
   const dur = fmtTime(state.duration);
-  const title = state.title ?? t("ui.noSong");
+  // Prefer mpv's live title (e.g. a radio's ICY "now playing"); if it's just the
+  // stream URL (no metadata), fall back to the station/track name we cached.
+  const live = state.title ?? "";
+  const title =
+    live && !/^https?:\/\//i.test(live)
+      ? live
+      : (trackTitle ?? state.url ?? t("ui.noSong"));
   const stateText = loading
     ? t("ui.loading")
     : state.paused
@@ -700,8 +710,10 @@ type Overlay =
   | { kind: "help" }
   | { kind: "eq" }
   | { kind: "searchInput" }
+  | { kind: "radioInput" }
   | { kind: "addInput"; target: "track" | "list" }
   | { kind: "searchResults"; results: SearchResult[] }
+  | { kind: "radioResults"; results: RadioStation[] }
   | { kind: "confirmTrack"; index: number }
   | { kind: "confirmPlaylist"; name: string }
   | { kind: "loading"; text: string };
@@ -1002,6 +1014,26 @@ function App({
     setSel(0);
     setOverlay({ kind: "searchResults", results });
   };
+  // Search internet radios (radio-browser.info) by name / genre / country.
+  const doRadioSearch = async (query: string) => {
+    setOverlay({ kind: "loading", text: t("ui.radioSearching") });
+    const results = await searchRadios(query);
+    if (results.length === 0) return setOverlay({ kind: "none" });
+    setSel(0);
+    setOverlay({ kind: "radioResults", results });
+  };
+  // Add (and play) the chosen station; cache its friendly name + label.
+  const addStation = (s: RadioStation) => {
+    const label = `📻 ${[s.country, [s.codec, s.bitrate].filter(Boolean).join(" ")]
+      .filter(Boolean)
+      .join(" · ")}`.trim();
+    cacheStation(s.url, s.name, label);
+    addUrl(s.url);
+    reload();
+    const idx = loadPlaylist().findIndex((tr) => tr.url === s.url);
+    if (idx >= 0) play(idx);
+    setOverlay({ kind: "none" });
+  };
   const openList = (name: string) => {
     setPlaylists(listPlaylists());
     setSideIdx(Math.max(0, listPlaylists().indexOf(name)));
@@ -1076,7 +1108,11 @@ function App({
       return;
     }
 
-    if (overlay.kind === "searchInput" || overlay.kind === "addInput") {
+    if (
+      overlay.kind === "searchInput" ||
+      overlay.kind === "radioInput" ||
+      overlay.kind === "addInput"
+    ) {
       if (key.escape) return closeOverlay();
       if (key.return) {
         const value = input.trim();
@@ -1084,6 +1120,7 @@ function App({
         closeOverlay();
         if (!value) return;
         if (ov.kind === "searchInput") void doSearch(value);
+        else if (ov.kind === "radioInput") void doRadioSearch(value);
         else if (ov.target === "list") void importList(value);
         else addTrack(value);
         return;
@@ -1121,6 +1158,8 @@ function App({
       searchLimit: SEARCH_PRESETS.length,
       searchResults:
         overlay.kind === "searchResults" ? overlay.results.length : 0,
+      radioResults:
+        overlay.kind === "radioResults" ? overlay.results.length : 0,
     };
     if (overlay.kind in listOverlays) {
       const count = listOverlays[overlay.kind]!;
@@ -1177,6 +1216,7 @@ function App({
     if (ch === "+" || ch === "=") return setVol(player.state.volume + 5);
     if (ch === "-") return setVol(player.state.volume - 5);
     if (ch === "/") return openOverlay({ kind: "searchInput" });
+    if (ch === "R") return openOverlay({ kind: "radioInput" });
     if (ch === "a")
       return openOverlay({
         kind: "addInput",
@@ -1280,6 +1320,12 @@ function App({
         if (newIdx >= 0) play(newIdx);
       }
       return closeOverlay();
+    }
+    if (overlay.kind === "radioResults") {
+      const s = overlay.results[sel];
+      if (s) addStation(s);
+      else closeOverlay();
+      return;
     }
   }
 
@@ -1419,6 +1465,7 @@ function App({
         repeat={repeat}
         width={cols - 2}
         artist={current >= 0 ? tracks[current]?.artist : undefined}
+        trackTitle={current >= 0 ? tracks[current]?.title : undefined}
         reaction={reaction}
       />
       <Box flexGrow={1}>
@@ -1448,7 +1495,7 @@ function App({
       </Box>
       <Box paddingX={1}>
         <Text color={accent} dimColor>
-          ↑↓ · ↵ play · space · n/p · s/r · v viz ({mode}) · e eq · / search ·
+          ↑↓ · ↵ play · space · n/p · v viz ({mode}) · e eq · / search · R radios ·
           f filter · a add · d del · o settings · ? help · q quit
         </Text>
       </Box>
@@ -1527,20 +1574,42 @@ function renderOverlay(
       </Modal>
     );
   }
-  if (overlay.kind === "searchInput" || overlay.kind === "addInput") {
+  if (overlay.kind === "radioResults") {
+    return (
+      <Modal title={t("ui.radioLabel").trim()} cols={cols} rows={rows} width={wide}>
+        <PickList
+          selected={sel}
+          maxVisible={maxVisible}
+          options={overlay.results.map(
+            (s) =>
+              `${s.name}  ${[s.country, [s.codec, s.bitrate ? s.bitrate + "k" : ""].filter(Boolean).join(" ")].filter(Boolean).join(" · ")}`,
+          )}
+        />
+      </Modal>
+    );
+  }
+  if (
+    overlay.kind === "searchInput" ||
+    overlay.kind === "radioInput" ||
+    overlay.kind === "addInput"
+  ) {
     const isList = overlay.kind === "addInput" && overlay.target === "list";
     const prompt =
       overlay.kind === "searchInput"
         ? t("ui.searchPrompt")
-        : isList
-          ? t("ui.importPrompt")
-          : t("ui.addPrompt");
+        : overlay.kind === "radioInput"
+          ? t("ui.radioPrompt")
+          : isList
+            ? t("ui.importPrompt")
+            : t("ui.addPrompt");
     const title =
       overlay.kind === "searchInput"
         ? t("ui.searchLabel")
-        : isList
-          ? t("ui.importLabel")
-          : t("ui.addLabel");
+        : overlay.kind === "radioInput"
+          ? t("ui.radioLabel")
+          : isList
+            ? t("ui.importLabel")
+            : t("ui.addLabel");
     return (
       <Modal title={title.trim()} cols={cols} rows={rows} width={wide}>
         <Text>{prompt}</Text>
@@ -1580,8 +1649,8 @@ function renderOverlay(
         <Text>
           ↑↓ navigate · ↵ play · space pause · ←→ seek{"\n"}
           n/p next/prev · s shuffle · r repeat · v visualizer{"\n"}
-          e equalizer · f filter · / search · a add · d delete{"\n"}
-          o settings · +/- volume · m mute · Tab panel · ? help · q quit
+          e equalizer · f filter · / search YouTube · R radios{"\n"}
+          a add · d delete · o settings · +/- volume · m mute · q quit
         </Text>
         <Box marginTop={1}>
           <Text dimColor>esc to close</Text>

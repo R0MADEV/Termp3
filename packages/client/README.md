@@ -3,6 +3,8 @@
 A **retro terminal music player** with a real **audio-reactive visualizer** —
 stream YouTube & radios (no downloads), with playlists, themes and multi-language.
 
+![catunes](https://raw.githubusercontent.com/R0MADEV/catunes/main/promo.png)
+
 > Full docs & source: **https://github.com/R0MADEV/catunes**
 
 ## Install

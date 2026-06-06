@@ -319,6 +319,14 @@ export function pruneTitleCache(): void {
   if (changed) saveCache(cache);
 }
 
+/** Caches a radio station's friendly name + label so it shows nicely and is
+ *  treated as fully resolved (no yt-dlp lookups on a raw stream URL). */
+export function cacheStation(url: string, name: string, label: string): void {
+  const cache = loadCache();
+  cache[url] = { title: name, duration: 0, artist: label };
+  saveCache(cache);
+}
+
 /** Stores known titles in the cache (e.g. from an import or a search). */
 export function cacheTitles(items: { url: string; title: string }[]): void {
   const cache = loadCache();

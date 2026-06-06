@@ -4,6 +4,8 @@
 
 [![CI](https://github.com/R0MADEV/catunes/actions/workflows/ci.yml/badge.svg)](https://github.com/R0MADEV/catunes/actions/workflows/ci.yml)
 
+![catunes](promo.png)
+
 Reproductor de música en terminal **retro**, con **salas sincronizadas**
 y **rotación de DJ por turnos** — escuchad juntos, desde la terminal.
 
