@@ -1,6 +1,6 @@
 {
   "name": "catunes",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Retro terminal music player with a real audio-reactive visualizer — stream YouTube & radios (no downloads), playlists, themes and multi-language. 🐱",
   "type": "module",
   "bin": {

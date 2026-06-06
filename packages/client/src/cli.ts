@@ -65,7 +65,7 @@ function stopStrayPlayers(): Promise<number> {
   });
 }
 
-const VERSION = "0.1.2";
+const VERSION = "0.1.3";
 
 // Apply the saved language (an explicit CATUNES_LANG env var still wins).
 {
