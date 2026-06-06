@@ -24,6 +24,7 @@ import {
   searchYouTube,
   isPlaylistUrl,
   fetchPlaylist,
+  expandAudioPath,
 } from "../../playlist.ts";
 import { searchRadios, type RadioStation } from "../../radio.ts";
 import {
@@ -1041,13 +1042,20 @@ function App({
     setOverlay({ kind: "none" });
   };
 
-  // Lists panel: a plain name creates an EMPTY list to fill later; a URL imports
-  // a YouTube playlist (or makes a 1-track list).
+  // Lists panel: a local folder path → a new list with all its music; a plain
+  // name → an empty list to fill later; a URL → imports a YouTube playlist.
   const importList = async (value: string) => {
-    if (!/^https?:\/\//i.test(value)) {
-      return openList(createPlaylist(value, []));
+    const v = value.trim();
+    if (!/^https?:\/\//i.test(v)) {
+      // Looks like a path? (starts with ~ . / or contains a separator)
+      if (/^[~./]/.test(v) || v.includes("/")) {
+        const files = expandAudioPath(v);
+        const name = v.replace(/\/+$/, "").split("/").pop() || "Local";
+        return openList(createPlaylist(name, files));
+      }
+      return openList(createPlaylist(v, [])); // plain name → empty list
     }
-    const url = value;
+    const url = v;
     setOverlay({ kind: "loading", text: t("ui.importing") });
     await ensureYtDlp(() => {});
     if (isPlaylistUrl(url)) {
@@ -1060,8 +1068,14 @@ function App({
   };
 
   // Tracks panel: add a single track to the active playlist (never a playlist).
-  const addTrack = (url: string) => {
-    addUrl(singleVideoUrl(url));
+  const addTrack = (input: string) => {
+    const v = input.trim();
+    if (/^https?:\/\//i.test(v)) {
+      addUrl(singleVideoUrl(v));
+    } else {
+      // A local path: a folder adds all its audio files, a file adds itself.
+      for (const p of expandAudioPath(v)) addUrl(p);
+    }
     reload();
     react("wink"); // the cat winks when you add a track
     setOverlay({ kind: "none" });

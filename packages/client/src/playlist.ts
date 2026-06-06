@@ -11,9 +11,12 @@ import {
   existsSync,
   appendFileSync,
   readdirSync,
+  statSync,
   rmSync,
 } from "node:fs";
-import { basename, join } from "node:path";
+import { basename, join, extname } from "node:path";
+import { homedir } from "node:os";
+import { parseFile } from "music-metadata";
 import {
   PLAYLISTS_DIR,
   DEFAULT_PLAYLIST_NAME,
@@ -222,8 +225,56 @@ function isLocalFile(url: string): boolean {
   return !/^(https?|rtmp|rtsp):\/\//i.test(url);
 }
 
+const AUDIO_EXT = new Set([
+  ".mp3", ".m4a", ".m4b", ".flac", ".wav", ".ogg", ".opus",
+  ".aac", ".wma", ".aiff", ".aif", ".alac", ".webm", ".mka",
+]);
+
+/**
+ * Expands a path: a folder → all audio files inside (recursive); a file → itself;
+ * a URL → unchanged. Lets the user add a whole music folder at once.
+ */
+export function expandAudioPath(input: string): string[] {
+  let p = input.trim().replace(/^["']|["']$/g, ""); // strip surrounding quotes
+  if (!p || /^(https?|rtmp|rtsp):\/\//i.test(p)) return p ? [p] : [];
+  // Expand a leading "~" to the home directory (the shell doesn't do it here).
+  if (p === "~" || p.startsWith("~/")) p = join(homedir(), p.slice(1));
+  let st;
+  try {
+    st = statSync(p);
+  } catch {
+    return [p]; // not a real path → pass through (mpv will report it)
+  }
+  if (!st.isDirectory()) return [p];
+  const out: string[] = [];
+  const walk = (dir: string) => {
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const full = join(dir, e.name);
+      if (e.isDirectory()) walk(full);
+      else if (AUDIO_EXT.has(extname(e.name).toLowerCase())) out.push(full);
+    }
+  };
+  walk(p);
+  return out.sort();
+}
+
+/** Reads a local file's ID3/metadata tags (title, artist, duration). */
+async function readLocalMeta(
+  path: string,
+): Promise<{ title: string; duration: number; artist?: string } | null> {
+  try {
+    const m = await parseFile(path, { duration: true });
+    const t = m.common.title?.trim();
+    const a = m.common.artist?.trim();
+    const title = t ? (a ? `${a} - ${t}` : t) : basename(path);
+    const d = Math.round(m.format.duration ?? 0);
+    return { title, duration: d > 0 ? d : 0, artist: a || undefined };
+  } catch {
+    return { title: basename(path), duration: 0 };
+  }
+}
+
 function toTrack(url: string, cache: Record<string, CacheEntry>): Track {
-  if (isLocalFile(url)) return { url, title: basename(url), resolved: true };
   const title = entryTitle(cache[url]);
   if (title)
     return {
@@ -233,6 +284,8 @@ function toTrack(url: string, cache: Record<string, CacheEntry>): Track {
       duration: entryDuration(cache[url]),
       artist: entryArtist(cache[url]),
     };
+  // Local files show the filename until their ID3 tags are read (lazily).
+  if (isLocalFile(url)) return { url, title: basename(url), resolved: false };
   return { url, title: url, resolved: false };
 }
 
@@ -347,13 +400,16 @@ export async function resolveTitlesAt(
   concurrency = 4,
 ): Promise<void> {
   const cache = loadCache();
-  // Needs work if the title, duration or artist was never fetched (legacy cache
-  // stored titles only). Local files have no remote metadata to fetch.
-  const needs = (tr: Track) =>
-    !isLocalFile(tr.url) &&
-    (!tr.resolved ||
+  // Needs work if the title, duration or artist was never resolved. Local files
+  // get their ID3 tags read once; remote tracks are looked up via yt-dlp.
+  const needs = (tr: Track) => {
+    if (isLocalFile(tr.url)) return !tr.resolved;
+    return (
+      !tr.resolved ||
       entryDuration(cache[tr.url]) === undefined ||
-      entryArtist(cache[tr.url]) === undefined);
+      entryArtist(cache[tr.url]) === undefined
+    );
+  };
   const pending = indices.filter((i) => tracks[i] && needs(tracks[i]!));
 
   let cursor = 0;
@@ -371,7 +427,9 @@ export async function resolveTitlesAt(
         cachedTitle && cachedDur !== undefined && cachedArtist !== undefined;
       const meta = complete
         ? { title: cachedTitle!, duration: cachedDur!, artist: cachedArtist! }
-        : await fetchMeta(tr.url);
+        : isLocalFile(tr.url)
+          ? await readLocalMeta(tr.url)
+          : await fetchMeta(tr.url);
       if (!meta) continue;
       // "" is the sentinel for "fetched, but no artist" so we never refetch it.
       const artist = meta.artist ?? "";
