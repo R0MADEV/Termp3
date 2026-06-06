@@ -25,6 +25,8 @@ import {
   isPlaylistUrl,
   fetchPlaylist,
   expandAudioPath,
+  toggleFavorite,
+  favoriteUrls,
 } from "../../playlist.ts";
 import { searchRadios, type RadioStation } from "../../radio.ts";
 import {
@@ -755,6 +757,7 @@ function App({
   const [mutedVol, setMutedVol] = useState<number | null>(null);
   const [filter, setFilter] = useState(""); // filter text for the current list
   const [filtering, setFiltering] = useState(false); // editing the filter
+  const [favs, setFavs] = useState<Set<string>>(() => favoriteUrls());
 
   const [overlay, setOverlay] = useState<Overlay>({ kind: "none" });
   const [sel, setSel] = useState(0); // selection index inside list overlays
@@ -1243,6 +1246,15 @@ function App({
       setFiltering(true);
       return;
     }
+    if (ch === "*") {
+      const tr = tracks[viewIdx[listIdx]!];
+      if (tr) {
+        toggleFavorite(tr.url);
+        setFavs(favoriteUrls());
+        setPlaylists(listPlaylists()); // the ★ Favorites list may appear/vanish
+      }
+      return;
+    }
     if (ch === "?") return openOverlay({ kind: "help" });
     if (ch === "d") {
       if (focus === "sidebar" && playlists[sideIdx]) {
@@ -1438,10 +1450,13 @@ function App({
     const tr = tracks[real];
     if (!tr) return null;
     const prefix = real === current ? "▶ " : hl ? "› " : "  ";
+    const star = favs.has(tr.url) ? "★ " : "  ";
     const durStr = tr.duration ? fmtTime(tr.duration) : "";
-    const room = trackW - prefix.length - (durStr ? durStr.length + 1 : 0);
+    const room = trackW - prefix.length - star.length - (durStr ? durStr.length + 1 : 0);
     const name = tr.title.slice(0, room).padEnd(room);
-    const line = durStr ? `${prefix}${name} ${durStr}` : `${prefix}${name}`;
+    const line = durStr
+      ? `${prefix}${star}${name} ${durStr}`
+      : `${prefix}${star}${name}`;
     return (
       <Text
         color={hl ? "black" : accent}
@@ -1510,7 +1525,7 @@ function App({
       <Box paddingX={1}>
         <Text color={accent} dimColor>
           ↑↓ · ↵ play · space · n/p · v viz ({mode}) · e eq · / search · R radios ·
-          f filter · a add · d del · o settings · ? help · q quit
+          f filter · * fav · a add · d del · o settings · ? help · q quit
         </Text>
       </Box>
     </Box>
@@ -1663,7 +1678,7 @@ function renderOverlay(
         <Text>
           ↑↓ navigate · ↵ play · space pause · ←→ seek{"\n"}
           n/p next/prev · s shuffle · r repeat · v visualizer{"\n"}
-          e equalizer · f filter · / search YouTube · R radios{"\n"}
+          e equalizer · f filter · * favorite · / search · R radios{"\n"}
           a add · d delete · o settings · +/- volume · m mute · q quit
         </Text>
         <Box marginTop={1}>

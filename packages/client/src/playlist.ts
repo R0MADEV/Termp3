@@ -219,6 +219,37 @@ export function createPlaylist(name: string, urls: string[]): string {
   return unique;
 }
 
+// --- favorites (a special auto-managed playlist) ---
+
+export const FAVORITES_NAME = "★ Favorites";
+
+/** The set of favorited URLs (empty if there are none). */
+export function favoriteUrls(): Set<string> {
+  const file = playlistFile(FAVORITES_NAME);
+  if (!existsSync(file)) return new Set();
+  const urls = readFileSync(file, "utf8")
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((u) => u && !u.startsWith("#"));
+  return new Set(urls);
+}
+
+/** Adds/removes a URL from favorites. Returns the new state (true = favorited). */
+export function toggleFavorite(url: string): boolean {
+  ensureConfig();
+  const favs = favoriteUrls();
+  const now = !favs.has(url);
+  if (now) favs.add(url);
+  else favs.delete(url);
+  const file = playlistFile(FAVORITES_NAME);
+  if (favs.size === 0) {
+    if (existsSync(file)) rmSync(file);
+  } else {
+    writeFileSync(file, `${[...favs].join("\n")}\n`);
+  }
+  return now;
+}
+
 // --- active playlist contents ---
 
 function isLocalFile(url: string): boolean {
