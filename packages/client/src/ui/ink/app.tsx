@@ -27,6 +27,7 @@ import {
   expandAudioPath,
   toggleFavorite,
   favoriteUrls,
+  removeFavorite,
 } from "../../playlist.ts";
 import { searchRadios, type RadioStation } from "../../radio.ts";
 import {
@@ -1149,8 +1150,12 @@ function App({
 
     if (overlay.kind === "confirmTrack") {
       if (key.return || ch === "y") {
-        removeUrl(tracks[overlay.index]!.url);
+        const url = tracks[overlay.index]!.url;
+        removeUrl(url);
+        removeFavorite(url); // don't leave a ghost ★ in Favorites
+        setFavs(favoriteUrls());
         if (current === overlay.index) setCurrent(-1);
+        setPlaylists(listPlaylists()); // ★ Favorites may have emptied
         reload();
         react("scared"); // the cat is startled when you delete
       }
@@ -1161,6 +1166,7 @@ function App({
         removePlaylist(overlay.name);
         const remaining = listPlaylists();
         setPlaylists(remaining);
+        setFavs(favoriteUrls()); // refresh ★ (e.g. if the Favorites list was deleted)
         if (activePlaylist() === overlay.name) switchPlaylist(remaining[0] ?? "Default");
         react("scared");
       }

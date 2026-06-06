@@ -234,6 +234,19 @@ export function favoriteUrls(): Set<string> {
   return new Set(urls);
 }
 
+/** Removes a URL from favorites if present (idempotent). */
+export function removeFavorite(url: string): void {
+  const favs = favoriteUrls();
+  if (!favs.has(url)) return;
+  favs.delete(url);
+  const file = playlistFile(FAVORITES_NAME);
+  if (favs.size === 0) {
+    if (existsSync(file)) rmSync(file);
+  } else {
+    writeFileSync(file, `${[...favs].join("\n")}\n`);
+  }
+}
+
 /** Adds/removes a URL from favorites. Returns the new state (true = favorited). */
 export function toggleFavorite(url: string): boolean {
   ensureConfig();
